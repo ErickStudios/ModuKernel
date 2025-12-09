@@ -1,18 +1,18 @@
 #include <stdint.h>
-static inline uint16_t inw(uint16_t port) {
+static uint16_t inw(uint16_t port) {
     uint16_t ret;
     __asm__ __volatile__("inw %1, %0" : "=a"(ret) : "Nd"(port));
     return ret;
 }
 
 // E/S
-static inline uint8_t inb(uint16_t port) {
+static uint8_t inb(uint16_t port) {
     uint8_t ret;
     __asm__ __volatile__("inb %1, %0" : "=a"(ret) : "dN"(port));
     return ret;
 }
 
-static inline void outb(uint16_t port, uint8_t val) {
+static void outb(uint16_t port, uint8_t val) {
     __asm__ __volatile__("outb %0, %1" : : "a"(val), "dN"(port));
 }
 
@@ -32,4 +32,11 @@ int memcmp(const void *s1, const void *s2, unsigned int n) {
         if (p1[i] != p2[i]) return (int)p1[i] - (int)p2[i];
     }
     return 0;
+}
+
+char CharToUpCase(char lower) {
+    if (lower >= 'a' && lower <= 'z') {
+        return lower - 32; // diferencia entre 'a' y 'A' en ASCII
+    }
+    return lower; // si no es minúscula, lo devuelve igual
 }

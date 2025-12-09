@@ -13,42 +13,8 @@
 // servicios globales
 KernelServices* GlobalServices;
 
-char InternalKeyboardReadChar() {
-	// espera una tecla
-    while ((inb(0x64) & 1) == 0);
-	// el codigo de escaneo
-    uint8_t scancode = inb(0x60);
-	// la escanea
-    if (scancode & 0x80) {
-        // tecla soltada
-        scancode &= 0x7F;
-		// si es esas tecla
-        if (scancode == 0x2A || scancode == 0x36) {
-			// shift se va
-            shift_pressed = 0;
-        }
-		// retorna null
-        return 0;
-	// si no es 0
-    } else {
-        // tecla presionada
-        if (scancode == 0x2A || scancode == 0x36) {
-			// la presiona
-            shift_pressed = 1;
-			// retornar null
-            return 0;
-        }
-		// el caracter
-        char c = scancode_table[scancode];
-		// retorna tecla
-        if (shift_pressed && c >= 'a' && c <= 'z') {
-			// convertir a mayúscula
-            c -= 32;
-        }
-		// retorna el caracter
-        return c;
-    }
-}
+// mayusculas y minusculas
+char LowerUpper = 0;
 
 void InternalDiskReadSector(uint32_t lba, uint8_t* buffer) {
 	// lo lee 1
@@ -181,6 +147,75 @@ void InternalSetActualDisplayService(DisplayServices* Serv)
 	// atributo de texto
 	text_attr = &Serv->CurrentAttrs;
 }
+
+char InternalKeyboardReadChar() {
+	while(1) {
+		uint8_t status = inb(0x64); // THAT'S WHY WE NEED I/O DRIVER, TO READ THE STATUS OF THE KEYBOARD AND THE SCANCODES :)
+
+		if(status & 0x01) {
+			uint8_t scancode = inb(0x60);
+
+			char character = 0;
+
+			if(scancode == 0x01) {
+			}
+			else if(scancode == 0x0E) character = '\b';
+			else if(scancode == 0x02) character = LowerUpper ? '!' : '1';
+			else if(scancode == 0x03) character = LowerUpper ? '"' : '2';
+			else if(scancode == 0x04) character = LowerUpper ? '#' : '3';
+			else if(scancode == 0x05) character = LowerUpper ? '$' : '4';
+			else if(scancode == 0x06) character = LowerUpper ? '%' : '5';
+			else if(scancode == 0x07) character = LowerUpper ? '&' : '6';
+			else if(scancode == 0x08) character = LowerUpper ? '/' : '7';
+			else if(scancode == 0x09) character = LowerUpper ? '(' : '8';
+			else if(scancode == 0x0A) character = LowerUpper ? ')' : '9';
+			else if(scancode == 0x0B) character = LowerUpper ? '=' : '0';
+			else if(scancode == 0x0C) character = LowerUpper ? '?' : '\'';
+			else if(scancode == 0x0D) character = LowerUpper ? '¿' : '!';
+			else if(scancode == 0x1A) character = LowerUpper ? '{' : '[';
+			else if(scancode == 0x1B) character = LowerUpper ? '}' : ']';
+			else if(scancode == 0x27) character = LowerUpper ? ':' : ';';
+			else if(scancode == 0x0D) character = LowerUpper ? '+' : '=';
+			else if(scancode == 0x33) character = LowerUpper ? '?' : ',';
+			else if(scancode == 0x34) character = LowerUpper ? '>' : '.';
+			else if(scancode == 0x35) character = LowerUpper ? '>' : '<';
+			else if(scancode == 0x3A) LowerUpper = !LowerUpper;
+			else if(scancode == 0x1E) character = 'a';
+			else if(scancode == 0x30) character = 'b';
+			else if(scancode == 0x2E) character = 'c';
+			else if(scancode == 0x20) character = 'd';
+			else if(scancode == 0x12) character = 'e';
+			else if(scancode == 0x21) character = 'f';
+			else if(scancode == 0x22) character = 'g';
+			else if(scancode == 0x23) character = 'h';
+			else if(scancode == 0x17) character = 'i';
+			else if(scancode == 0x24) character = 'j';
+			else if(scancode == 0x25) character = 'k';
+			else if(scancode == 0x26) character = 'l';
+			else if(scancode == 0x32) character = 'm';
+			else if(scancode == 0x31) character = 'n';
+			else if(scancode == 0x18) character = 'o';
+			else if(scancode == 0x19) character = 'p';
+			else if(scancode == 0x10) character = 'q';
+			else if(scancode == 0x13) character = 'r';
+			else if(scancode == 0x1F) character = 's';
+			else if(scancode == 0x14) character = 't';
+			else if(scancode == 0x16) character = 'u';
+			else if(scancode == 0x2F) character = 'v';
+			else if(scancode == 0x11) character = 'w';
+			else if(scancode == 0x2D) character = 'x';
+			else if(scancode == 0x15) character = 'y';
+			else if(scancode == 0x2C) character = 'z';
+			else if(scancode == 0x39) character = ' ';
+			else if(scancode == 0x1C) character = '\n';
+
+			return LowerUpper == 1 ? CharToUpCase(character) : character;
+		}
+	}
+
+}
+
+
 KernelServices InitializeKernel()
 {
 	// servicios
@@ -227,11 +262,46 @@ KernelServices InitializeKernel()
 
 void InternalMiniKernelProgram(KernelServices* Services)
 {
-	for (;;)
-	{
-		char Key = InternalKeyboardReadChar();
-		char Txt[2] = { Key, 0 };
-		Services->Display->printg(Key);
+	char bufcmd[256];
+	int char_set = 0;
+
+	Services->Display->printg("ModuKernel:~# ");
+	for (;;) { 
+		char key = InternalKeyboardReadChar(); 
+
+		if (key == '\b') {
+			if (Services->Display->CurrentCharacter > 0) {
+				Services->Display->setCursorPosition(
+					Services->Display->CurrentCharacter - 2,
+					Services->Display->CurrentLine
+				);
+				char_set--;
+				// opcional: borrar el carácter
+				char *vidmem = (char*)0xb8000;
+				int pos = Services->Display->CurrentLine * 80 * 2 + Services->Display->CurrentCharacter - 2;
+				vidmem[pos] = ' ';
+				vidmem[pos+1] = *text_attr;
+			}
+		}
+		else {
+			char buff[2] = { key , 0};
+
+			if (key != '\n') bufcmd[char_set] = key;
+
+			Services->Display->printg(buff);
+		}
+
+		if (key != 0 && key != '\n') char_set++;
+
+		if (key == '\n')
+		{	
+			char* cmd = bufcmd;
+
+			if (char_set == 3 ? (memcmp(cmd, "cls", char_set) == 0) : 0) InternalClearScreen();
+
+			Services->Display->printg("ModuKernel:~# ");
+			char_set = 0;
+		}
 	}
 }
 
@@ -283,6 +353,9 @@ void* AllocatePool(unsigned int size) {
 }
 void InternalClearScreen()
 {
+	*row_selected = 0;
+	*line_selected = 0;
+
 	// la memoria de video
 	char *vidmem = (char *) 0xb8000; unsigned int i=0;
 	// limpia la pantalla
