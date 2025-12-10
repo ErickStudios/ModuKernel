@@ -17,3 +17,5 @@ void InternalMiniKernelProgram(KernelServices* Services);
 void k_main();
 // función para leer una tecla
 char InternalKeyboardReadChar();
+// ejecuta un comando
+void InternalSysCommandExecute(KernelServices* Services, char* command, int len);

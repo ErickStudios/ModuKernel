@@ -10,6 +10,9 @@
 #include "functions/c_main.h"
 #include "functions/heap_main.h"
 
+// incluir funciones de la libreria c de bajo nivel
+#include "libc/String.h"
+
 // servicios globales
 KernelServices* GlobalServices;
 
@@ -58,8 +61,8 @@ FatFile InternalDiskFindFile(char* name, char* ext) {
 		if (dir[i].name[0] == 0x00 || dir[i].name[0] == 0xE5) continue;
 		
 		// si coincide el nombe y la extension
-        if (memcmp(dir[i].name, name, 8) == 0 &&
-            memcmp(dir[i].ext, ext, 3) == 0) {
+        if (InternalMemoryComp(dir[i].name, name, 8) == 0 &&
+            InternalMemoryComp(dir[i].ext, ext, 3) == 0) {
 			// convertirlo a retorno multiple
 			FatFile File;
 
@@ -118,7 +121,7 @@ int InternalDiskGetFile(FatFile file, void** content, int* size) {
 			// tamaño copiado
             unsigned int copy_size = remaining > bs->bytes_per_sector ? bs->bytes_per_sector : remaining;
 			// copiar memoria
-			memcpy(out + offset, sector, copy_size);
+			InternalmMemoryCoppy(out + offset, sector, copy_size);
 
 			// aumentar variables
             offset    += copy_size;
@@ -225,6 +228,9 @@ KernelServices InitializeKernel()
 	IoServices* IO = AllocatePool(sizeof(IoServices));
 	DiskServices* Dsk = AllocatePool(sizeof(DiskServices));
 
+	// servicios principales
+	Services.Run = &InternalSysCommandExecute;
+
 	// funcionalidades
 	Services.Display = Dsp;
 	Services.Memory = Mem;
@@ -249,6 +255,9 @@ KernelServices InitializeKernel()
 
 	// memoria
 	Services.Memory->AllocatePool = &AllocatePool;
+	Services.Memory->MoveMemory = &InternalMemMove;
+	Services.Memory->CoppyMemory = &InternalmMemoryCoppy;
+	Services.Memory->CompareMemory = &InternalMemoryComp;
 
 	// disco
 	Services.File->RunFile = &ProcessCrtByFile;
@@ -260,47 +269,73 @@ KernelServices InitializeKernel()
 	return Services;
 }
 
+void InternalSysCommandExecute(KernelServices* Services, char* command, int len)
+{
+	if (StrCmp(command, "cls") == 0) Services->Display->clearScreen();
+	else if (len >= 5 ? (Services->Memory->CompareMemory(command, "echo ", 5) == 0) : 0)
+	{
+		if (len == 5); else Services->Display->printg(command + 5);
+
+		Services->Display->printg("\n");
+	}
+	else if (len == 3 ? (Services->Memory->CompareMemory(command, "prp", 3) == 0) : 0)
+	{
+		Services->Display->setAttrs(0, 10); Services->Display->printg("ModuKernel");
+		Services->Display->setAttrs(0, 9); Services->Display->printg(":~");
+		Services->Display->setAttrs(0, 7); Services->Display->printg("# ");
+	}
+}
+
 void InternalMiniKernelProgram(KernelServices* Services)
 {
-	char bufcmd[256];
-	int char_set = 0;
+	// mensajes
+	Services->Display->printg("Welcome to ModuKernel!\n");
 
-	Services->Display->printg("ModuKernel:~# ");
+	// el prompt
+	Services->Run(Services, "prp", 3);
+
+	// buffers
+	char bufcmd[256]; int char_set = 0;
+
 	for (;;) { 
 		char key = InternalKeyboardReadChar(); 
 
 		if (key == '\b') {
+			// si no es 0
 			if (Services->Display->CurrentCharacter > 0) {
-				Services->Display->setCursorPosition(
-					Services->Display->CurrentCharacter - 2,
-					Services->Display->CurrentLine
-				);
+				// retroceder posicion
+				Services->Display->setCursorPosition(Services->Display->CurrentCharacter - 2, Services->Display->CurrentLine);
+				// caracter anterior
 				char_set--;
-				// opcional: borrar el carácter
+				// borrar el caracter
 				char *vidmem = (char*)0xb8000;
+				// linea actual
 				int pos = Services->Display->CurrentLine * 80 * 2 + Services->Display->CurrentCharacter - 2;
+				// llenar con caracter vacio
 				vidmem[pos] = ' ';
+				// el atributo de texto
 				vidmem[pos+1] = *text_attr;
 			}
 		}
 		else {
+			// el caracter
 			char buff[2] = { key , 0};
-
+			// si no es enter agregar caracter
 			if (key != '\n') bufcmd[char_set] = key;
-
+			// imprimir caracter
 			Services->Display->printg(buff);
 		}
-
-		if (key != 0 && key != '\n') char_set++;
-
+		// para el caracter
+		if (key != 0 && key != '\n' && key != '\b') char_set++;
+		// si es enter
 		if (key == '\n')
 		{	
+			// el buffer
 			char* cmd = bufcmd;
-
-			if (char_set == 3 ? (memcmp(cmd, "cls", char_set) == 0) : 0) InternalClearScreen();
-
-			Services->Display->printg("ModuKernel:~# ");
-			char_set = 0;
+			// ejecutar servicios
+			Services->Run(Services, cmd, char_set);
+			// ejecutar para imprimir prompt
+			Services->Run(Services, "prp", 3); char_set = 0;
 		}
 	}
 }
@@ -404,6 +439,19 @@ void InternalPrintgNonLine(char *message)
 		{
 			// salto
 			(*line_selected)++; i=((*line_selected)*80*2); *message++;
+		
+		if (*line_selected >= 25) {
+			// mover todo hacia arriba (24 líneas)
+			InternalMemMove(vidmem, vidmem + 80*2, 24*80*2);
+			// limpiar última línea
+			for (int j = 0; j < 80; j++) {
+				vidmem[(24*80 + j)*2] = ' ';
+				vidmem[(24*80 + j)*2 + 1] = *text_attr;
+			}
+			*line_selected = 24;
+			i = (*line_selected)*80*2;
+		}
+
 		} else {
 			// llenar con el caracter
 			vidmem[i]=*message; *message++; i++;

@@ -5,6 +5,8 @@
 #include "MemoryServices.h"
 #include "IOServices.h"
 #include "DiskServices.h"
+// el tipo para ejecutar un comando
+typedef void (*KernelServicesExecuteCommand)(struct _KernelServices* Services, char* command, int len);
 // para los servicios principales
 typedef struct _KernelServices {
     // para la pantalla
@@ -15,5 +17,7 @@ typedef struct _KernelServices {
     IoServices* InputOutpud;
     // el servicio de disco
     DiskServices* File;
+    // el servicio de comandos
+    KernelServicesExecuteCommand Run;
 } KernelServices;
 #endif

@@ -16,7 +16,8 @@ static void outb(uint16_t port, uint8_t val) {
     __asm__ __volatile__("outb %0, %1" : : "a"(val), "dN"(port));
 }
 
-void *memcpy(void *dest, const void *src, unsigned int n) {
+
+int InternalmMemoryCoppy(void *dest, const void *src, unsigned int n) {
     unsigned char *d = (unsigned char*)dest;
     const unsigned char *s = (const unsigned char*)src;
     for (unsigned int i = 0; i < n; i++) {
@@ -25,7 +26,7 @@ void *memcpy(void *dest, const void *src, unsigned int n) {
     return dest;
 }
 
-int memcmp(const void *s1, const void *s2, unsigned int n) {
+int InternalMemoryComp(const void *s1, const void *s2, unsigned int n) {
     const unsigned char *p1 = (const unsigned char*)s1;
     const unsigned char *p2 = (const unsigned char*)s2;
     for (unsigned int i = 0; i < n; i++) {
@@ -39,4 +40,22 @@ char CharToUpCase(char lower) {
         return lower - 32; // diferencia entre 'a' y 'A' en ASCII
     }
     return lower; // si no es minúscula, lo devuelve igual
+}
+
+void InternalMemMove(void *dest, const void *src, int n) {
+    unsigned char *d = (unsigned char *)dest;
+    const unsigned char *s = (const unsigned char *)src;
+
+    if (d < s) {
+        // Copiar hacia adelante
+        for (int i = 0; i < n; i++) {
+            d[i] = s[i];
+        }
+    } else if (d > s) {
+        // Copiar hacia atrás (para manejar solapamiento)
+        for (int i = n; i > 0; i--) {
+            d[i-1] = s[i-1];
+        }
+    }
+    return dest;
 }
