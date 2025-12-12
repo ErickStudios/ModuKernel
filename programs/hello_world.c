@@ -1,11 +1,14 @@
-// libreria c
+// hello_world.c
 #include "../library/lib.h"
 
-// principal
-int Main(KernelServices* Services)
+KernelStatus Main(KernelServices* Services)
 {
-    // imprimir hello world
-    Services->Display->printg("hello world");
-    // success
-    return 0;
+    Services->Display->printg("hello world\n");
+    return KernelStatusSuccess;
+}
+
+/* punto de entrada que el linker pondrá en offset 0 */
+KernelStatus _start(KernelServices* Services)
+{
+    return Main(Services);
 }

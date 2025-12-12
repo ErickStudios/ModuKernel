@@ -15,126 +15,199 @@
 
 // servicios globales
 KernelServices* GlobalServices;
-
 // mayusculas y minusculas
 char LowerUpper = 0;
+// version del sistema
+int InternalServicesVersion = 10;
 
-void InternalDiskReadSector(uint32_t lba, uint8_t* buffer) {
+static BlockHeader* heap_start = (BlockHeader*)&_heap_start;
+static BlockHeader* free_list = NULL;
+
+void InitHeap() 
+{
+    free_list = heap_start;
+    free_list->size = _heap_end - _heap_start - sizeof(BlockHeader);
+    free_list->free = 1;
+    free_list->next = NULL;
+}
+KernelStatus InternalDiskReadSector(unsigned int lba, unsigned char* buffer) {
 	// lo lee 1
     outb(0x1F6, 0xE0 | ((lba >> 24) & 0x0F)); 
 	// lo lee 2
     outb(0x1F2, 1); outb(0x1F3, (uint8_t) lba); outb(0x1F4, (uint8_t)(lba >> 8)); 
 	// lo lee 3
-	outb(0x1F5, (uint8_t)(lba >> 16)); outb(0x1F7, 0x20);      
-	                 
+	outb(0x1F5, (uint8_t)(lba >> 16)); outb(0x1F7, 0x20);     
+
+	int timeout = 100000;
+
     // esperar a que DRQ esté listo
-    while (!(inb(0x1F7) & 0x08));
+    while (!(inb(0x1F7) & 0x08) && (timeout--)) if (timeout < 1) return KernelStatusInfiniteLoopTimeouted;
 
     // leer 256 palabras (512 bytes)
     for (int i = 0; i < 256; i++) ((uint16_t*)buffer)[i] = inw(0x1F0);
+
+	return KernelStatusSuccess;
 }
 FatFile InternalDiskFindFile(char* name, char* ext) {
-    // leer boot sector
     uint8_t sector0[512];
-	// lee el sector 0
     InternalDiskReadSector(0, sector0);
 
-	// el sector
-    struct _FAT12_BootSector* bs = (struct _FAT12_BootSector*) sector0;
-    // calcular root dir
-    unsigned int root_start = bs->reserved_sectors + bs->num_fats * bs->fat_size_sectors;
-    // sectores
-	unsigned int root_sectors = (bs->root_entries * 32) / bs->bytes_per_sector;
-	// el sector
-    uint8_t root_buffer[512 * root_sectors];
-	// los lee
-    for (int s = 0; s < root_sectors; s++) {
-		// lo busca
-        InternalDiskReadSector(root_start + s, root_buffer + s*512);
+    struct _FAT12_BootSector* bs_local = (struct _FAT12_BootSector*) sector0;
+
+    // Copia el boot sector a heap (memoria persistente)
+    struct _FAT12_BootSector* bs = (struct _FAT12_BootSector*) AllocatePool(sizeof(*bs));
+    if (!bs) {
+        FatFile empty = {0};
+        return empty; // o manejar error
     }
-    
-	// recorrer directorio
+    InternalMemoryCopy(bs, bs_local, sizeof(*bs));
+
+    // calcular root_start, root_sectors...
+    unsigned int root_start = bs->reserved_sectors + bs->num_fats * bs->fat_size_sectors;
+    unsigned int root_sectors = (bs->root_entries * 32) / bs->bytes_per_sector;
+
+    // en lugar de buffer grande en la pila, usa heap o lee sector a sector
+    uint8_t* root_buffer = (uint8_t*) AllocatePool(bs->bytes_per_sector * root_sectors);
+    if (!root_buffer) {
+        // liberar bs si es necesario
+        FatFile empty = {0};
+        return empty;
+    }
+
+    for (int s = 0; s < root_sectors; s++) {
+        InternalDiskReadSector(root_start + s, root_buffer + s * bs->bytes_per_sector);
+    }
+
     struct _FAT12_DirEntry* dir = (struct _FAT12_DirEntry*) root_buffer;
-    // recorre los directorios
-	for (int i = 0; i < bs->root_entries; i++) {
-        // si no existe o fue eliminado continuar
-		if (dir[i].name[0] == 0x00 || dir[i].name[0] == 0xE5) continue;
-		
-		// si coincide el nombe y la extension
+    int total_entries = bs->root_entries;
+
+    for (int i = 0; i < total_entries; i++) {
+        if (dir[i].name[0] == 0x00 || dir[i].name[0] == 0xE5) continue;
+
         if (InternalMemoryComp(dir[i].name, name, 8) == 0 &&
-            InternalMemoryComp(dir[i].ext, ext, 3) == 0) {
-			// convertirlo a retorno multiple
-			FatFile File;
-
-			// mover retornos
-			File.bs = bs; File.sector = dir[i];
-
-			// retornar la estrcutura
-			return File;
+            InternalMemoryComp(dir[i].name + 8, ext, 3) == 0) {
+            FatFile File;
+            File.bs = bs;           // puntero a la copia en heap (válido después del return)
+            File.sector = dir[i];   // copia por valor del dir entry
+            // opcional: liberar root_buffer si ya no se necesita
+            return File;
         }
     }
+
+    // no encontrado: liberar root_buffer y bs si necesario
+    FatFile empty = {0};
+    return empty;
 }
-int InternalDiskGetFile(FatFile file, void** content, int* size) {
-    // ir al sector
-	struct _FAT12_BootSector* bs = file.bs;
-    struct _FAT12_DirEntry dir = file.sector;
+char* InternalReadLine()
+{
+	// buffers
+	char bufcmd[256]; int char_set = 0;
+	for (;;)
+	{
+		char key = GlobalServices->InputOutpud->WaitKey(); 
 
-    // leer FAT completa (usamos la primera copia)
-    unsigned int fat_start = bs->reserved_sectors;
-    unsigned int fat_size = bs->fat_size_sectors * bs->bytes_per_sector;
-    
-	// crear la memoria
-	uint8_t* fat = (uint8_t*) AllocatePool(fat_size);
+		if (key == '\b') {
+			// si no es 0
+			if (GlobalServices->Display->CurrentCharacter > 0) {
+				// retroceder posicion
+				GlobalServices->Display->setCursorPosition(GlobalServices->Display->CurrentCharacter - 2, GlobalServices->Display->CurrentLine);
+				// caracter anterior
+				char_set--;
+				// borrar el caracter
+				char *vidmem = (char*)0xb8000;
+				// linea actual
+				int pos = GlobalServices->Display->CurrentLine * 80 * 2 + GlobalServices->Display->CurrentCharacter - 2;
+				// llenar con caracter vacio
+				vidmem[pos] = ' ';
+				// el atributo de texto
+				vidmem[pos+1] = *text_attr;
+			}
+		}
+		else {
+			// el caracter
+			char buff[2] = { key , 0};
+			// si no es enter agregar caracter
+			if (key != '\n') bufcmd[char_set] = key;
+			// imprimir caracter
+			GlobalServices->Display->printg(buff);
+		}
+		// para el caracter
+		if (key != 0 && key != '\n' && key != '\b') char_set++;
+		// si es enter
+		if (key == '\n')
+		{	
+			// retornarlo
+			char* retval = AllocatePool(sizeof(char) * 256);
 
-   // leer sectores
-	for (unsigned int s = 0; s < bs->fat_size_sectors; s++) {
-        InternalDiskReadSector(fat_start + s, fat + s*bs->bytes_per_sector);
+			for (short index = 0; index < 256; index++) retval[index] = bufcmd[index];
+
+			return retval;
+		}
+	}
+}
+KernelStatus InternalDiskGetFile(FatFile file, void** content, int* size)
+{
+    if (file.sector.name[0] == 0x00)
+        return KernelStatusNotFound;
+
+    struct _FAT12_BootSector* bs = file.bs;
+    struct _FAT12_DirEntry dir   = file.sector;
+
+    // --- Leer FAT completa ---
+    unsigned int fat_bytes = bs->fat_size_sectors * bs->bytes_per_sector;
+    uint8_t* fat = (uint8_t*) AllocatePool(fat_bytes);
+    if (!fat) return KernelStatusNoBudget;
+
+    for (unsigned int s = 0; s < bs->fat_size_sectors; s++)
+    {
+        KernelStatus st = InternalDiskReadSector(bs->reserved_sectors + s,
+                                                 fat + s * bs->bytes_per_sector);
+
+        if (_StatusError(st))
+            return st;
     }
 
-    // calcular inicio de data region
+    // --- Calcular data region ---
     unsigned int root_start   = bs->reserved_sectors + bs->num_fats * bs->fat_size_sectors;
-	unsigned int root_sectors = (bs->root_entries * 32) / bs->bytes_per_sector;
+    unsigned int root_sectors = (bs->root_entries * 32) / bs->bytes_per_sector;
     unsigned int data_start   = root_start + root_sectors;
 
-    // reservar buffer para el archivo
+    // --- Reservar buffer para output ---
     uint8_t* out = (uint8_t*) AllocatePool(dir.file_size);
-    if (!out) return -1;
+    if (!out) return KernelStatusMemoryRot;
 
-	// informacion
     unsigned int cluster   = dir.first_cluster;
     unsigned int remaining = dir.file_size;
     unsigned int offset    = 0;
-	
-	// el sector
+
     uint8_t sector[512];
 
-	// recuperarlo
-    while (cluster < 0xFF8 && remaining > 0) {
-		// sector grande
+    // --- Leer clusters ---
+    while (cluster < 0xFF8 && remaining > 0)
+    {
         unsigned int lba = data_start + (cluster - 2) * bs->sectors_per_cluster;
 
-		// recorrerlo
-        for (unsigned int s = 0; s < bs->sectors_per_cluster && remaining > 0; s++) {
-            // leer sector
-			InternalDiskReadSector(lba + s, sector);
+        for (unsigned int s = 0; s < bs->sectors_per_cluster && remaining > 0; s++)
+        {
+            KernelStatus st = InternalDiskReadSector(lba + s, sector);
+            if (_StatusError(st)) return st;
 
-			// tamaño copiado
-            unsigned int copy_size = remaining > bs->bytes_per_sector ? bs->bytes_per_sector : remaining;
-			// copiar memoria
-			InternalmMemoryCoppy(out + offset, sector, copy_size);
+            unsigned int copy = (remaining > bs->bytes_per_sector ?
+                                 bs->bytes_per_sector : remaining);
 
-			// aumentar variables
-            offset    += copy_size;
-            remaining -= copy_size;
+            InternalMemoryCopy(out + offset, sector, copy);
+
+            offset    += copy;
+            remaining -= copy;
         }
 
-		// obtiene entrada de fat
+        // siguiente cluster
         cluster = get_fat_entry(cluster, fat);
     }
 
     *content = out;
     *size    = dir.file_size;
-    return 0;
+    return KernelStatusSuccess;
 }
 void InternalSetAttriubtes(char bg, char fg)
 {
@@ -150,18 +223,37 @@ void InternalSetActualDisplayService(DisplayServices* Serv)
 	// atributo de texto
 	text_attr = &Serv->CurrentAttrs;
 }
+KernelStatus InternalKernelReset(int func) 
+{
 
-char InternalKeyboardReadChar() {
+    __asm__ __volatile__("cli");   // Deshabilitar interrupciones
+
+    if (func == 1) {
+        outw(0x604, 0x2000);
+        outw(0xB004, 0x2000);
+
+        goto triple_fault;
+    }
+
+    while (inb(0x64) & 0x02);
+
+	outb(0x64, 0xFE);
+
+triple_fault:
+    return KernelStatusDisaster;
+}
+char InternalKeyboardReadChar()
+{
+	int extended = 0;
 	while(1) {
-		uint8_t status = inb(0x64); // THAT'S WHY WE NEED I/O DRIVER, TO READ THE STATUS OF THE KEYBOARD AND THE SCANCODES :)
+		uint8_t status = inb(0x64);
 
 		if(status & 0x01) {
 			uint8_t scancode = inb(0x60);
 
 			char character = 0;
 
-			if(scancode == 0x01) {
-			}
+			if(scancode == 0x01) character = KernelSimpleIoSpecKey(9);
 			else if(scancode == 0x0E) character = '\b';
 			else if(scancode == 0x02) character = LowerUpper ? '!' : '1';
 			else if(scancode == 0x03) character = LowerUpper ? '"' : '2';
@@ -174,7 +266,7 @@ char InternalKeyboardReadChar() {
 			else if(scancode == 0x0A) character = LowerUpper ? ')' : '9';
 			else if(scancode == 0x0B) character = LowerUpper ? '=' : '0';
 			else if(scancode == 0x0C) character = LowerUpper ? '?' : '\'';
-			else if(scancode == 0x0D) character = LowerUpper ? '¿' : '!';
+			else if(scancode == 0x0D) character = LowerUpper ? ' ' : '!';
 			else if(scancode == 0x1A) character = LowerUpper ? '{' : '[';
 			else if(scancode == 0x1B) character = LowerUpper ? '}' : ']';
 			else if(scancode == 0x27) character = LowerUpper ? ':' : ';';
@@ -210,152 +302,234 @@ char InternalKeyboardReadChar() {
 			else if(scancode == 0x15) character = 'y';
 			else if(scancode == 0x2C) character = 'z';
 			else if(scancode == 0x39) character = ' ';
-			else if(scancode == 0x1C) character = '\n';
+			else if(scancode == 0x1C) character = '\n'; 
+
+			else if(scancode == 0x3B) character = KernelSimpleIoFuncKey(1);
+			else if(scancode == 0x3C) character = KernelSimpleIoFuncKey(2);
+			else if(scancode == 0x3D) character = KernelSimpleIoFuncKey(3);
+			else if(scancode == 0x3E) character = KernelSimpleIoFuncKey(4);
+			else if(scancode == 0x3F) character = KernelSimpleIoFuncKey(5);
+			else if(scancode == 0x40) character = KernelSimpleIoFuncKey(6);
+			else if(scancode == 0x41) character = KernelSimpleIoFuncKey(7);
+			else if(scancode == 0x42) character = KernelSimpleIoFuncKey(8);
+			else if(scancode == 0x43) character = KernelSimpleIoFuncKey(9);
+			else if(scancode == 0x44) character = KernelSimpleIoFuncKey(10);
+
+            // Tecla extendida
+            if (scancode == 0xE0) {
+                extended = 1;
+                continue;
+            }
+
+			if (extended) {
+                extended = 0;
+
+                if (scancode == 0x48) return KernelSimpleIoSpecKey(1); // arriba
+                if (scancode == 0x50) return KernelSimpleIoSpecKey(2); // abajo
+                if (scancode == 0x4B) return KernelSimpleIoSpecKey(3); // izquierda
+                if (scancode == 0x4D) return KernelSimpleIoSpecKey(4); // derecha
+				if (scancode == 0x1D) return KernelSimpleIoSpecKey(4); // control izquierdo
+				if (scancode == 0x38) return KernelSimpleIoSpecKey(5); // AltGr
+				if (scancode == 0x5B) return KernelSimpleIoSpecKey(6); // Logo derecho
+				if (scancode == 0x5C) return KernelSimpleIoSpecKey(7); // Logo izquierdo
+				if (scancode == 0x5D) return KernelSimpleIoSpecKey(8); // menu/apps
+            }
 
 			return LowerUpper == 1 ? CharToUpCase(character) : character;
 		}
 	}
 
 }
-
-
-KernelServices InitializeKernel()
+void InitializeKernel(KernelServices* Services)
 {
-	// servicios
-	KernelServices Services;
-	DisplayServices* Dsp = AllocatePool(sizeof(DisplayServices));
-	MemoryServices* Mem = AllocatePool(sizeof(MemoryServices));
-	IoServices* IO = AllocatePool(sizeof(IoServices));
-	DiskServices* Dsk = AllocatePool(sizeof(DiskServices));
+    // opcional: limpia la estructura principal (si vive en stack)
+    InternalMemorySet(Services, 0, sizeof(KernelServices));
 
-	// servicios principales
-	Services.Run = &InternalSysCommandExecute;
+    // reservar subestructuras
+    DisplayServices* Dsp = AllocatePool(sizeof(DisplayServices));
+    MemoryServices* Mem = AllocatePool(sizeof(MemoryServices));
+    IoServices* IO     = AllocatePool(sizeof(IoServices));
+    DiskServices* Dsk  = AllocatePool(sizeof(DiskServices));
+    KernelMiscServices* Msc = AllocatePool(sizeof(KernelMiscServices));
 
-	// funcionalidades
-	Services.Display = Dsp;
-	Services.Memory = Mem;
-	Services.InputOutpud = IO;
-	Services.File = Dsk;
+    // comprobar allocs
+    if (!Dsp || !Mem || !IO || !Dsk || !Msc) {
+        InternalPrintg("ERR: alloc failed in InitializeKernel", 1);
+        // manejo de error mínimo: puedes haltear o intentar fallback
+        return;
+    }
 
-	// pantalla
-	Services.Display->printg_i = &InternalPrintg;
-	Services.Display->printg = &InternalPrintgNonLine;
-	Services.Display->setCursorPosition = &InternalCursorPos;
-	Services.Display->clearScreen = &InternalClearScreen;
-	Services.Display->Set = &InternalSetActualDisplayService;
-	Services.Display->setAttrs = &InternalSetAttriubtes;
+    // limpiar memoria de cada subestructura
+    InternalMemorySet(Dsp, 0, sizeof(DisplayServices));
+    InternalMemorySet(Mem, 0, sizeof(MemoryServices));
+    InternalMemorySet(IO,  0, sizeof(IoServices));
+    InternalMemorySet(Dsk, 0, sizeof(DiskServices));
+    InternalMemorySet(Msc, 0, sizeof(KernelMiscServices));
 
-	Services.Display->CurrentLine = 0;
-	Services.Display->CurrentCharacter = 0;
-	Services.Display->CurrentAttrs = 0;
+    // conectar subestructuras
+    Services->Display = Dsp;
+    Services->Memory  = Mem;
+    Services->InputOutpud = IO;
+    Services->File    = Dsk;
+    Services->Misc    = Msc;
 
-	// input/outpud
-	Services.InputOutpud->Input = &inb;
-	Services.InputOutpud->Outpud = &outb;
+    // servicios principales
+    Services->Misc->Run       = &InternalSysCommandExecute;
+	Services->Misc->Reset	  = &InternalKernelReset;
+    Services->ServicesVersion = &InternalServicesVersion;
 
-	// memoria
-	Services.Memory->AllocatePool = &AllocatePool;
-	Services.Memory->MoveMemory = &InternalMemMove;
-	Services.Memory->CoppyMemory = &InternalmMemoryCoppy;
-	Services.Memory->CompareMemory = &InternalMemoryComp;
+    // pantalla
+    Dsp->printg_i          = &InternalPrintg;
+    Dsp->printg            = &InternalPrintgNonLine;
+    Dsp->setCursorPosition = &InternalCursorPos;
+    Dsp->clearScreen       = &InternalClearScreen;
+    Dsp->Set               = &InternalSetActualDisplayService;
+    Dsp->setAttrs          = &InternalSetAttriubtes;
 
-	// disco
-	Services.File->RunFile = &ProcessCrtByFile;
-	Services.File->FindFile = &InternalDiskFindFile;
-	Services.File->GetFile = &InternalDiskGetFile;
+    Dsp->CurrentLine      = 0;
+    Dsp->CurrentCharacter = 0;
+    Dsp->CurrentAttrs     = 0;
 
-	GlobalServices = &Services;
+    // IO
+    IO->Input   = &inb;
+    IO->Outpud  = &outb;
+    IO->WaitKey = &InternalKeyboardReadChar;
+    IO->ReadLine= &InternalReadLine;
 
-	return Services;
+    // memoria
+    Mem->AllocatePool = &AllocatePool;
+    Mem->MoveMemory   = &InternalMemMove;
+    Mem->CoppyMemory  = &InternalMemoryCopy;
+    Mem->CompareMemory= &InternalMemoryComp;
+    Mem->FreePool     = &FreePool;
+
+    // disco
+    Dsk->RunFile    = &ProcessCrtByFile;
+    Dsk->FindFile   = &InternalDiskFindFile;
+    Dsk->GetFile    = &InternalDiskGetFile;
+    Dsk->ReadSector = &InternalDiskReadSector;
+
+    // hacer global la estructura principal
+    GlobalServices = Services;
 }
-
-void InternalSysCommandExecute(KernelServices* Services, char* command, int len)
+void InternalSysCommandExecute(KernelServices* Services, char* command, int lena)
 {
+	int len = StrLen(command);
+
 	if (StrCmp(command, "cls") == 0) Services->Display->clearScreen();
-	else if (len >= 5 ? (Services->Memory->CompareMemory(command, "echo ", 5) == 0) : 0)
+	else if (StrCmp(command ,"ls") == 0)
 	{
-		if (len == 5); else Services->Display->printg(command + 5);
+		// leer boot sector
+    	uint8_t sector0[512]; InternalDiskReadSector(0, sector0);
 
-		Services->Display->printg("\n");
-	}
-	else if (len == 3 ? (Services->Memory->CompareMemory(command, "prp", 3) == 0) : 0)
-	{
-		Services->Display->setAttrs(0, 10); Services->Display->printg("ModuKernel");
-		Services->Display->setAttrs(0, 9); Services->Display->printg(":~");
-		Services->Display->setAttrs(0, 7); Services->Display->printg("# ");
-	}
+		struct _FAT12_BootSector* bs = (struct _FAT12_BootSector*) sector0;
+		unsigned int root_start = bs->reserved_sectors + bs->num_fats * bs->fat_size_sectors;
+		unsigned int root_sectors = (bs->root_entries * 32) / bs->bytes_per_sector;
+		uint8_t root_buffer[512 * root_sectors];
+
+// Leer todos los sectores del directorio raíz
+for (int s = 0; s < root_sectors; s++) {
+    InternalDiskReadSector(root_start + s, root_buffer + s * bs->bytes_per_sector);
 }
 
-void InternalMiniKernelProgram(KernelServices* Services)
+// Recorrer todas las entradas del directorio raíz
+struct _FAT12_DirEntry* dir = (struct _FAT12_DirEntry*)root_buffer;
+int total_entries = bs->root_entries;
+
+for (int i = 0; i < total_entries; i++) {
+    if (dir[i].name[0] == 0x00 || dir[i].name[0] == 0xE5) continue;
+
+    // Mostrar nombre y extensión
+    Services->Display->printg(dir[i].name);
+	Services->Display->printg("     ");
+}
+
+Services->Display->printg("\n");
+	}
+	else if (StrnCmp(command, "echo ", 5) == 0) { if (len == 5); else Services->Display->printg(command + 5);Services->Display->printg("\n"); }
+	else if (StrCmp(command, "prp") == 0){Services->Display->setAttrs(0, 10); Services->Display->printg("ModuKernel");Services->Display->setAttrs(0, 9); Services->Display->printg(":~");Services->Display->setAttrs(0, 7); Services->Display->printg("# ");}
+	else if (StrCmp(command, "reset") == 0) Services->Misc->Reset(0);
+	else if (StrCmp(command, "shutdown") == 0) Services->Misc->Reset(1);
+	else if (StrCmp(command, "") == 0);
+	else
+	{
+		if (len < 9)
+		{
+			char name[9];
+
+			// Rellenar con espacios (mejor práctica)
+			InternalMemorySet(name, ' ', 8);
+			name[8] = '\0';
+
+			// Copiar el comando a name
+			for (int i = 0; i < len && i < 8; i++)
+				name[i] = command[i];
+
+			FatFile File = Services->File->FindFile(name, "BIN");
+
+			void* buffer = 0;
+			int size = 0;
+
+			KernelStatus Status = Services->File->GetFile(File, &buffer, &size);
+			#define USER_LOAD_ADDR ((void*)0x00400000)
+
+			if ((!_StatusError(Status)) && size != 0)
+			{
+
+				// copia el binario al address donde fue enlazado
+				InternalMemoryCopy(USER_LOAD_ADDR, buffer, size);
+
+				// opcional: si tienes .bss, cero el espacio después del binario
+				// memset(USER_LOAD_ADDR + size, 0, bss_size);
+
+				typedef KernelStatus (*ProgramEntry)(KernelServices*);
+				ProgramEntry entry = (ProgramEntry) USER_LOAD_ADDR;
+				KernelStatus result = entry(Services);
+
+				// mostrar retorno
+				char out[13];
+				IntToString(result, out);
+				Services->Display->printg("\nEl programa retorno = ");
+				Services->Display->printg(out);
+			}
+			else
+			{
+				if (size == 0) Services->Display->printg("(size==0)\n");
+				Services->Display->printg("KernelStatus Status = ");
+				char error[13]; 
+				IntToString(Status, error);
+				Services->Display->printg(error);
+				Services->Display->printg("; // no se pudo leer\n");
+			}
+		}
+	}
+}
+KernelStatus InternalMiniKernelProgram(KernelServices* Services)
 {
 	// mensajes
 	Services->Display->printg("Welcome to ModuKernel!\n");
 
-	// el prompt
-	Services->Run(Services, "prp", 3);
+	for (;;) {
+		Services->Misc->Run(Services, "prp", 0);
+		char* Prompt = Services->InputOutpud->ReadLine();
 
-	// buffers
-	char bufcmd[256]; int char_set = 0;
-
-	for (;;) { 
-		char key = InternalKeyboardReadChar(); 
-
-		if (key == '\b') {
-			// si no es 0
-			if (Services->Display->CurrentCharacter > 0) {
-				// retroceder posicion
-				Services->Display->setCursorPosition(Services->Display->CurrentCharacter - 2, Services->Display->CurrentLine);
-				// caracter anterior
-				char_set--;
-				// borrar el caracter
-				char *vidmem = (char*)0xb8000;
-				// linea actual
-				int pos = Services->Display->CurrentLine * 80 * 2 + Services->Display->CurrentCharacter - 2;
-				// llenar con caracter vacio
-				vidmem[pos] = ' ';
-				// el atributo de texto
-				vidmem[pos+1] = *text_attr;
-			}
-		}
-		else {
-			// el caracter
-			char buff[2] = { key , 0};
-			// si no es enter agregar caracter
-			if (key != '\n') bufcmd[char_set] = key;
-			// imprimir caracter
-			Services->Display->printg(buff);
-		}
-		// para el caracter
-		if (key != 0 && key != '\n' && key != '\b') char_set++;
-		// si es enter
-		if (key == '\n')
-		{	
-			// el buffer
-			char* cmd = bufcmd;
-			// ejecutar servicios
-			Services->Run(Services, cmd, char_set);
-			// ejecutar para imprimir prompt
-			Services->Run(Services, "prp", 3); char_set = 0;
-		}
+		Services->Misc->Run(Services, Prompt, 0);
 	}
 }
-
 void k_main() 
 {
-	// inicializar instancia de kernel
-	KernelServices Services = InitializeKernel();
+	InitHeap();
+    KernelServices Services;
 
-	// inicializar pantalla con la propiedad
-	Services.Display->Set(Services.Display);
-	// ajustar attributos
-	Services.Display->setAttrs(0, 7);
-	// limpiar pantalla
-	Services.Display->clearScreen();
+	InitializeKernel(&Services);
 
-	// inicializar programa
-	InternalMiniKernelProgram(&Services);
+    Services.Display->Set(Services.Display);
+    Services.Display->setAttrs(0, 7);
+    Services.Display->clearScreen();
+
+    InternalMiniKernelProgram(&Services);
 }
-int ProcessCrtByFile(char* name, char* ext, KernelServices* Services)
+KernelStatus ProcessCrtByFile(char* name, char* ext, KernelServices* Services)
 {
 	FatFile file = InternalDiskFindFile(name, ext);
 
@@ -372,19 +546,49 @@ int ProcessCrtByFile(char* name, char* ext, KernelServices* Services)
 		int result = entry(Services);
 	}
 }
-
 void* AllocatePool(unsigned int size) {
-	// el empiezo de cabezera
-    char* p = heap_ptr;
-	// si no hay mas espacio
-    if (p + size > &_heap_end) {
-		// sin memoria
-        return 0;
+    BlockHeader* current = free_list;
+
+    while (current) {
+        if (current->free && current->size >= size) {
+
+            if (current->size > size + sizeof(BlockHeader)) {
+                // dividir el bloque
+                BlockHeader* new_block = (BlockHeader*)((char*)current + sizeof(BlockHeader) + size);
+                new_block->size = current->size - size - sizeof(BlockHeader);
+                new_block->free = 1;
+                new_block->next = current->next;
+
+                current->next = new_block;
+            }
+
+            current->free = 0;
+            current->size = size;
+            return (char*)current + sizeof(BlockHeader);
+        }
+
+        current = current->next;
     }
-	// aumentar heap
-    heap_ptr += size;
-	// retornar puntero
-    return p;
+
+    return 0; // out of memory
+}
+void FreePool(void* ptr) {
+    if (!ptr) return;
+
+    BlockHeader* block = (BlockHeader*)((char*)ptr - sizeof(BlockHeader));
+    block->free = 1;
+
+    // intento de coalescer bloques contiguos
+    BlockHeader* current = free_list;
+
+    while (current) {
+        if (current->free && current->next && current->next->free) {
+            // unir bloques
+            current->size += sizeof(BlockHeader) + current->next->size;
+            current->next = current->next->next;
+        }
+        current = current->next;
+    }
 }
 void InternalClearScreen()
 {
@@ -416,11 +620,13 @@ void InternalPrintg(char *message, unsigned int line)
 			// llenar con el caracter
 			vidmem[i]=*message; *message++; i++;
 			// llenar con el atributo de texto
-			vidmem[i]=*text_attr; i++;
+			vidmem[i]=0x07; i++;
 		};
 	};
 }
-void InternalCursorPos(int x, int y) { *(row_selected) = x; *(line_selected) = y; }
+void InternalCursorPos(int x, int y) { 
+	*(row_selected) = x; *(line_selected) = y; 
+}
 void InternalPrintgNonLine(char *message)
 {
 	// memoria de video
@@ -435,11 +641,11 @@ void InternalPrintgNonLine(char *message)
 	while(*message!=0)
 	{
 		// nueva linea
-		if(*message=='\n') 
+		if(*message=='\n' || (((*row_selected)%(2*80)) > (78*2))) 
 		{
 			// salto
 			(*line_selected)++; i=((*line_selected)*80*2); *message++;
-		
+
 		if (*line_selected >= 25) {
 			// mover todo hacia arriba (24 líneas)
 			InternalMemMove(vidmem, vidmem + 80*2, 24*80*2);

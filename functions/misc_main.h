@@ -10,12 +10,14 @@ int shift_pressed = 0;
 // crea memoria
 void* AllocatePool(unsigned int size);
 // inicializa el kernel
-KernelServices InitializeKernel();
+void InitializeKernel(KernelServices* Services);
 // el mini programa del kernel
-void InternalMiniKernelProgram(KernelServices* Services);
+KernelStatus InternalMiniKernelProgram(KernelServices* Services);
 // el kernel principal
 void k_main();
 // función para leer una tecla
 char InternalKeyboardReadChar();
 // ejecuta un comando
 void InternalSysCommandExecute(KernelServices* Services, char* command, int len);
+// para apagar
+KernelStatus InternalKernelReset(int func);

@@ -24,5 +24,3 @@ void InitializeLibrary(Sys* System)
     gIOS = System->InputOutpud;
     gMS = System->Memory;
 }
-
-// funcion de print

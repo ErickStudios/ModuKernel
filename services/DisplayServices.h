@@ -8,8 +8,6 @@ typedef void (*KernelSimpleDisplayPrintgInternal)(char* msg, unsigned int line);
 typedef void (*KernelSimpleDisplayPrintg)(char* msg);
 // ir a
 typedef void (*KernelSimpleDisplayGoto)(int col, int row);
-// ir a
-typedef void (*KernelSimpleDisplayGoto)(int col, int row);
 // el tipo de limpieza
 typedef void (*KernelSimpleDisplayClearScreen)();
 // el tipo de atributos

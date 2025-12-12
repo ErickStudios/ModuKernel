@@ -42,4 +42,40 @@ int StrnCmp(char* s1, char* s2, int len)
     }
     return Diferences; // 0 si iguales, >0 si hay diferencias
 }
+// a string
+void IntToString(int value, char *buffer) {
+    char temp[12];
+    int i = 0;
+    int isNegative = 0;
+
+    if (value == 0) {
+        buffer[0] = '0';
+        buffer[1] = '\0';
+        return;
+    }
+
+    if (value < 0) {
+        isNegative = 1;
+        value = -value;
+    }
+
+    // convertir número en orden inverso
+    while (value > 0) {
+        temp[i++] = (value % 10) + '0';
+        value /= 10;
+    }
+
+    if (isNegative) {
+        temp[i++] = '-';
+    }
+
+    // revertir en buffer final
+    int j = 0;
+    while (i > 0) {
+        buffer[j++] = temp[--i];
+    }
+
+    buffer[j] = '\0';
+}
+
 #endif

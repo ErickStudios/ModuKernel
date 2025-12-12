@@ -5,6 +5,8 @@ static uint16_t inw(uint16_t port) {
     return ret;
 }
 
+#define NULL 0
+
 // E/S
 static uint8_t inb(uint16_t port) {
     uint8_t ret;
@@ -16,13 +18,28 @@ static void outb(uint16_t port, uint8_t val) {
     __asm__ __volatile__("outb %0, %1" : : "a"(val), "dN"(port));
 }
 
+static inline void outw(unsigned short port, unsigned short value)
+{
+    __asm__ __volatile__("outw %0, %1" : : "a"(value), "Nd"(port));
+}
 
-int InternalmMemoryCoppy(void *dest, const void *src, unsigned int n) {
+char* InternalReadLine();
+
+void * InternalMemoryCopy(void *dest, const void *src, unsigned int n) {
     unsigned char *d = (unsigned char*)dest;
     const unsigned char *s = (const unsigned char*)src;
     for (unsigned int i = 0; i < n; i++) {
         d[i] = s[i];
     }
+    return dest;
+}
+
+void* InternalMemorySet(void* dest, int value, unsigned int count)
+{
+    unsigned char* ptr = (unsigned char*)dest;
+    while (count--)
+        *ptr++ = (unsigned char)value;
+
     return dest;
 }
 
@@ -41,8 +58,8 @@ char CharToUpCase(char lower) {
     }
     return lower; // si no es minúscula, lo devuelve igual
 }
-
-void InternalMemMove(void *dest, const void *src, int n) {
+void FreePool(void* ptr);
+void * InternalMemMove(void *dest, const void *src, int n) {
     unsigned char *d = (unsigned char *)dest;
     const unsigned char *s = (const unsigned char *)src;
 
@@ -59,3 +76,9 @@ void InternalMemMove(void *dest, const void *src, int n) {
     }
     return dest;
 }
+
+typedef struct BlockHeader {
+    unsigned int size;
+    unsigned char free;
+    struct BlockHeader* next;
+} BlockHeader;

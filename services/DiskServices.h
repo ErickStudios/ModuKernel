@@ -1,5 +1,7 @@
 #ifndef DiskServicesDotH
 #define DiskServicesDotH
+// incluir basicos
+#include "basic.h"
 // declaracion temprana
 struct _KernelServices;
 // archivo fat
@@ -7,9 +9,11 @@ struct _FatFile;
 // servicio de buscar archivos archivos
 typedef struct _FatFile (*KernelSimpleDiskFindFile)(char* name, char* ext);
 // cargar archivo
-typedef int (*KernelSimpleDiskGetFile)(struct _FatFile file, void** content, int* size);
+typedef enum _KernelStatus (*KernelSimpleDiskGetFile)(struct _FatFile file, void** content, int* size);
 // servicio de ejecutar archivos
-typedef int (*KernelSimpleDiskExecuteFile)(char* name, char* ext, struct _KernelServices* Services);
+typedef enum _KernelStatus (*KernelSimpleDiskExecuteFile)(char* name, char* ext, struct _KernelServices* Services);
+// para leer un sector
+typedef enum _KernelStatus (*KernelSimpleDiskReadSector)(unsigned int lba, unsigned char* buffer);
 // servicios de disco
 typedef struct _DiskServices {
     // servicio para ejecutar archivos
@@ -18,5 +22,7 @@ typedef struct _DiskServices {
     KernelSimpleDiskFindFile FindFile;
     // para cargar archivos
     KernelSimpleDiskGetFile GetFile;
+    // para leer sectores
+    KernelSimpleDiskReadSector ReadSector;
 } DiskServices;
 #endif
