@@ -2,17 +2,33 @@
  * link.ld
  */
 
+/* formato */
 OUTPUT_FORMAT(elf32-i386)
+
+/* inicio */
 ENTRY(start)
+
+/* secciones */
 SECTIONS
 {
+    /* actual */
 	. = 0x100000;
-	.text : {*(.text)}
-	.data : {*(.data)}
-	.bss  : {*(.bss)}
 
-    /* Definir el heap después de las secciones */
+    /* codigo */
+	.text : {*(.text)}
+    /* datos */
+	.data : {*(.data)}
+    /* sin inicializar*/
+	.bss  : {
+    __bss_start = .;      /* marca inicio de bss */
+    *(.bss*) *(COMMON)    /* coloca todas las variables sin inicializar */
+    __bss_end = .;        /* marca fin de bss */
+    }
+
+    /* para AllocatePool y Servicios.Memory->AllocatePool*/
     _heap_start = .;
-    . += 0x100000;       /* tamaño del heap: 1 MiB, ajusta según necesites */
+    /* fin del heap */
+    . += 0x100000;
+    /* fin */
     _heap_end = .;
 }

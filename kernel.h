@@ -1,5 +1,7 @@
 #include <stdint.h>
 
+typedef unsigned long long size_t;
+
 #define NULL 0
 
 // E/S
@@ -53,12 +55,6 @@ int InternalMemoryComp(const void *s1, const void *s2, unsigned int n) {
     return 0;
 }
 
-char CharToUpCase(char lower) {
-    if (lower >= 'a' && lower <= 'z') {
-        return lower - 32; // diferencia entre 'a' y 'A' en ASCII
-    }
-    return lower; // si no es minúscula, lo devuelve igual
-}
 void FreePool(void* ptr);
 void * InternalMemMove(void *dest, const void *src, int n) {
     unsigned char *d = (unsigned char *)dest;

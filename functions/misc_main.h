@@ -16,7 +16,7 @@ KernelStatus InternalMiniKernelProgram(KernelServices* Services);
 // el kernel principal
 void k_main();
 // función para leer una tecla
-char InternalKeyboardReadChar();
+unsigned char InternalKeyboardReadChar();
 // ejecuta un comando
 void InternalSysCommandExecute(KernelServices* Services, char* command, int len);
 // para apagar

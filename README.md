@@ -23,16 +23,13 @@ Puede hacer lo siguiente para contribuir
 
 Un ejemplo como base para estas contribuciones puede ser
 ```c
-// incluir la libreria
+// incluir libreria
 #include "../library/lib.h"
 
-// funcion principal visible
-KernelStatus Main(KernelServices* Services)
+// el punto de entrada estandart
+KernelStatus ErickMain(KernelServices* Services)
 {
-    // ... tu codigo...
+    Services->Display->printg("hello world\n");
     return KernelStatusSuccess;
 }
-
-// punto de entrada interno para el compilador
-KernelStatus _start(KernelServices* Services) {return Main(Services);}
 ```

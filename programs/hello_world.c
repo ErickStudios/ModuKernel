@@ -1,14 +1,8 @@
-// hello_world.c
+// hello_world.c alias KERNEL.BIN
 #include "../library/lib.h"
 
-KernelStatus Main(KernelServices* Services)
+KernelStatus ErickMain(KernelServices* Services)
 {
     Services->Display->printg("hello world\n");
     return KernelStatusSuccess;
-}
-
-/* punto de entrada que el linker pondrá en offset 0 */
-KernelStatus _start(KernelServices* Services)
-{
-    return Main(Services);
 }

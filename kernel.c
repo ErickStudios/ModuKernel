@@ -129,7 +129,7 @@ char* InternalReadLine()
 			// si no es enter agregar caracter
 			if (key != '\n') bufcmd[char_set] = key;
 			// imprimir caracter
-			GlobalServices->Display->printg(buff);
+			if (key != '\n') GlobalServices->Display->printg(buff);
 		}
 		// para el caracter
 		if (key != 0 && key != '\n' && key != '\b') char_set++;
@@ -242,7 +242,7 @@ KernelStatus InternalKernelReset(int func)
 triple_fault:
     return KernelStatusDisaster;
 }
-char InternalKeyboardReadChar()
+unsigned char InternalKeyboardReadChar()
 {
 	int extended = 0;
 	while(1) {
@@ -471,26 +471,42 @@ Services->Display->printg("\n");
 			int size = 0;
 
 			KernelStatus Status = Services->File->GetFile(File, &buffer, &size);
-			#define USER_LOAD_ADDR ((void*)0x00400000)
 
-			if ((!_StatusError(Status)) && size != 0)
-			{
+			#define USER_LOAD_ADDR ((uint8_t*)0x00400000)
 
-				// copia el binario al address donde fue enlazado
+			typedef struct {
+				char magic[8];       // "ModuBin\0"
+				uint32_t entry;       // dirección de ErickMain
+				uint32_t bss_start;   // dirección inicio .bss
+				uint32_t bss_end;     // dirección fin .bss
+			} UserHeader;
+
+			if ((!_StatusError(Status)) && size >= sizeof(UserHeader)) {
+				// Copiar binario a su dirección de enlace
 				InternalMemoryCopy(USER_LOAD_ADDR, buffer, size);
 
-				// opcional: si tienes .bss, cero el espacio después del binario
-				// memset(USER_LOAD_ADDR + size, 0, bss_size);
+				// Leer encabezado
+				UserHeader* hdr = (UserHeader*)USER_LOAD_ADDR;
+				if (Services->Memory->CompareMemory(hdr->magic, "ModuBin", 7) != 0) {
+					Services->Display->printg("header magic invalido\n");
+				}
 
+				// Cero .bss
+				if (hdr->bss_end > hdr->bss_start) {
+					size_t bss_size = (size_t)(hdr->bss_end - hdr->bss_start);
+					InternalMemorySet((void*)hdr->bss_start, 0, bss_size);
+				}
+
+				// Ejecutar
 				typedef KernelStatus (*ProgramEntry)(KernelServices*);
-				ProgramEntry entry = (ProgramEntry) USER_LOAD_ADDR;
+				ProgramEntry entry = (ProgramEntry)(uintptr_t)hdr->entry;
 				KernelStatus result = entry(Services);
 
-				// mostrar retorno
 				char out[13];
 				IntToString(result, out);
 				Services->Display->printg("\nEl programa retorno = ");
 				Services->Display->printg(out);
+				Services->Display->printg("\n");
 			}
 			else
 			{
@@ -513,7 +529,9 @@ KernelStatus InternalMiniKernelProgram(KernelServices* Services)
 		Services->Misc->Run(Services, "prp", 0);
 		char* Prompt = Services->InputOutpud->ReadLine();
 
+		Services->Display->printg("\n");
 		Services->Misc->Run(Services, Prompt, 0);
+		Services->Memory->FreePool(Prompt);
 	}
 }
 void k_main() 

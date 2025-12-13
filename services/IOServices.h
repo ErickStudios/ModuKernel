@@ -9,7 +9,7 @@ typedef unsigned char (*KernelSimpleIoInput)(unsigned short port);
 // el tipo de outpud
 typedef void (*KernelSimpleIoOutpud)(unsigned short port, unsigned char val);
 // el tipo de teclado y tecla
-typedef char (*KernelSimpleIoKeyWait)();
+typedef unsigned char (*KernelSimpleIoKeyWait)();
 // el tipo de leer linea
 typedef char* (*KernelSimpleIoReadLine)();
 // el tipo de servicios de salida

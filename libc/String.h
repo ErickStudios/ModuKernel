@@ -77,5 +77,37 @@ void IntToString(int value, char *buffer) {
 
     buffer[j] = '\0';
 }
+// a int
+int StringToInt(char* Value)
+{
+    // si el valor es nulo entonces 0
+    if (Value[0] == 0) return 0;
 
+    // detectar signo negativo
+    int Negative = (Value[0] == '-');
+
+    // longitud de la cadena
+    int Len = StrLen(Value);
+
+    int Valor = 0;
+    int Cif = 1;
+
+    // recorrer de derecha a izquierda
+    for (int i = Len - 1; i >= (Negative ? 1 : 0); i--)
+    {
+        char c = Value[i];
+        if (c < '0' || c > '9') continue; // ignorar caracteres no numéricos
+        Valor += (c - '0') * Cif;
+        Cif *= 10;
+    }
+
+    if (Negative) Valor = -Valor;
+    return Valor;
+}
+char CharToUpCase(char lower) {
+    if (lower >= 'a' && lower <= 'z') {
+        return lower - 32; // diferencia entre 'a' y 'A' en ASCII
+    }
+    return lower; // si no es minúscula, lo devuelve igual
+}
 #endif
