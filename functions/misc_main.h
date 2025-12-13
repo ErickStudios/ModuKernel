@@ -21,3 +21,7 @@ unsigned char InternalKeyboardReadChar();
 void InternalSysCommandExecute(KernelServices* Services, char* command, int len);
 // para apagar
 KernelStatus InternalKernelReset(int func);
+// para ejecutar un binario
+KernelStatus InternalRunBinary(void* buffer, int size, KernelServices* Services);
+// para encontrar un archivo extendido
+FatFile InternalExtendedFindFile(char* path);

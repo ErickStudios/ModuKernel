@@ -110,4 +110,27 @@ char CharToUpCase(char lower) {
     }
     return lower; // si no es minúscula, lo devuelve igual
 }
+// para separar
+int StrSplit(char* str, char** buffer, char splitter)
+{
+    int count = 0;
+    char* token = str;
+
+    while (*str)
+    {
+        if (*str == splitter)
+        {
+            *str = '\0';             // cortar aquí
+            buffer[count++] = token; // guardar inicio del token
+            token = str + 1;         // siguiente token
+        }
+        str++;
+    }
+
+    // último token
+    if (*token != '\0')
+        buffer[count++] = token;
+
+    return count;
+}
 #endif

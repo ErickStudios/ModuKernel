@@ -273,7 +273,7 @@ unsigned char InternalKeyboardReadChar()
 			else if(scancode == 0x0D) character = LowerUpper ? '+' : '=';
 			else if(scancode == 0x33) character = LowerUpper ? '?' : ',';
 			else if(scancode == 0x34) character = LowerUpper ? '>' : '.';
-			else if(scancode == 0x35) character = LowerUpper ? '>' : '<';
+			else if(scancode == 0x35) character = LowerUpper ? '<' : '/';
 			else if(scancode == 0x3A) LowerUpper = !LowerUpper;
 			else if(scancode == 0x1E) character = 'a';
 			else if(scancode == 0x30) character = 'b';
@@ -376,6 +376,7 @@ void InitializeKernel(KernelServices* Services)
     // servicios principales
     Services->Misc->Run       = &InternalSysCommandExecute;
 	Services->Misc->Reset	  = &InternalKernelReset;
+	Services->Misc->RunBinary = &InternalRunBinary;
     Services->ServicesVersion = &InternalServicesVersion;
 
     // pantalla
@@ -408,9 +409,93 @@ void InitializeKernel(KernelServices* Services)
     Dsk->FindFile   = &InternalDiskFindFile;
     Dsk->GetFile    = &InternalDiskGetFile;
     Dsk->ReadSector = &InternalDiskReadSector;
+	Dsk->OpenFile 	= &InternalExtendedFindFile;
 
     // hacer global la estructura principal
     GlobalServices = Services;
+}
+FatFile InternalExtendedFindFile(char* path)
+{
+    // Abrir tabla FSLST.IFS
+    FatFile file = GlobalServices->File->FindFile("FSLST   ", "IFS");
+
+    void* buffer;
+    int size;
+
+    KernelStatus status = GlobalServices->File->GetFile(file, &buffer, &size);
+
+    if (!_StatusError(status))
+    {
+        char* text = (char*)buffer;
+        char* parts[128]; // espacio para líneas
+
+        int n = StrSplit(text, parts, '\n');
+
+        for (int i = 0; i < n; i++)
+        {
+            char* part = parts[i];
+            if (StrCmp(part, "") == 0) continue;
+
+            char* entry[3];
+            int entryLen = StrSplit(part, entry, ';');
+
+            if (entryLen != 3) continue;
+
+            char* route = entry[0];
+            char* nameRaw = entry[1];
+            char* extRaw  = entry[2];
+
+            // comparar ruta lógica con path
+            if (StrCmp(route, path) == 0)
+            {
+                char name[9]; InternalMemorySet(name, ' ', 8); name[8] = '\0';
+                for (int j = 0; j < StrLen(nameRaw) && j < 8; j++) name[j] = nameRaw[j];
+
+                char ext[4]; InternalMemorySet(ext, ' ', 3); ext[3] = '\0';
+                for (int j = 0; j < StrLen(extRaw) && j < 3; j++) ext[j] = extRaw[j];
+
+                GlobalServices->Memory->FreePool(buffer);
+                return GlobalServices->File->FindFile(name, ext);
+            }
+        }
+
+        GlobalServices->Memory->FreePool(buffer);
+    }
+
+	FatFile fileNull = {0};
+    return fileNull; // no encontrado
+}
+KernelStatus InternalRunBinary(void* buffer, int size, KernelServices* Services) {
+    #define USER_LOAD_ADDR ((uint8_t*)0x00400000)
+
+    typedef struct {
+        char magic[8];       // "ModuBin\0"
+        uint32_t entry;      // dirección de ErickMain
+        uint32_t bss_start;  // inicio .bss
+        uint32_t bss_end;    // fin .bss
+    } UserHeader;
+
+    if (size < sizeof(UserHeader)) {
+        Services->Display->printg("binario demasiado pequeño\n");
+        return KernelStatusDisaster;
+    }
+
+    InternalMemoryCopy(USER_LOAD_ADDR, buffer, size);
+
+    UserHeader* hdr = (UserHeader*)USER_LOAD_ADDR;
+    if (Services->Memory->CompareMemory(hdr->magic, "ModuBin", 7) != 0) {
+        Services->Display->printg("header magic invalido\n");
+        return KernelStatusDisaster;
+    }
+
+    if (hdr->bss_end > hdr->bss_start) {
+        size_t bss_size = (size_t)(hdr->bss_end - hdr->bss_start);
+        InternalMemorySet((void*)hdr->bss_start, 0, bss_size);
+    }
+
+    typedef KernelStatus (*ProgramEntry)(KernelServices*);
+    ProgramEntry entry = (ProgramEntry)(uintptr_t)hdr->entry;
+    return entry(Services);
 }
 void InternalSysCommandExecute(KernelServices* Services, char* command, int lena)
 {
@@ -419,105 +504,136 @@ void InternalSysCommandExecute(KernelServices* Services, char* command, int lena
 	if (StrCmp(command, "cls") == 0) Services->Display->clearScreen();
 	else if (StrCmp(command ,"ls") == 0)
 	{
-		// leer boot sector
-    	uint8_t sector0[512]; InternalDiskReadSector(0, sector0);
+		FatFile StructureFs = Services->File->FindFile("FSLST   ", "IFS");
+		void* StructFs; int FsSize;
+		KernelStatus StructureFound = Services->File->GetFile(StructureFs, &StructFs, &FsSize);
 
-		struct _FAT12_BootSector* bs = (struct _FAT12_BootSector*) sector0;
-		unsigned int root_start = bs->reserved_sectors + bs->num_fats * bs->fat_size_sectors;
-		unsigned int root_sectors = (bs->root_entries * 32) / bs->bytes_per_sector;
-		uint8_t root_buffer[512 * root_sectors];
+		if (!_StatusError(StructureFound))
+		{
+			char* text = (char*)StructFs;
+			char* parts[128]; // espacio para líneas
 
-// Leer todos los sectores del directorio raíz
-for (int s = 0; s < root_sectors; s++) {
-    InternalDiskReadSector(root_start + s, root_buffer + s * bs->bytes_per_sector);
-}
+			int n = StrSplit(text, parts, '\n');
 
-// Recorrer todas las entradas del directorio raíz
-struct _FAT12_DirEntry* dir = (struct _FAT12_DirEntry*)root_buffer;
-int total_entries = bs->root_entries;
+			for (int i = 0; i < n; i++)
+			{
+				char* part = parts[i];
+				if (StrCmp(part, "") == 0) continue;
 
-for (int i = 0; i < total_entries; i++) {
-    if (dir[i].name[0] == 0x00 || dir[i].name[0] == 0xE5) continue;
+				char* entry[3];
+				int entryLen = StrSplit(part, entry, ';');
 
-    // Mostrar nombre y extensión
-    Services->Display->printg(dir[i].name);
-	Services->Display->printg("     ");
-}
+				if (entryLen != 3) continue;
 
-Services->Display->printg("\n");
+				char* route = entry[0];
+				char* nameRaw = entry[1];
+				char* extRaw  = entry[2];
+
+				char name[9]; InternalMemorySet(name, ' ', 8); name[8] = '\0';
+				for (int j = 0; j < StrLen(nameRaw) && j < 8; j++) name[j] = nameRaw[j];
+
+				char ext[4]; InternalMemorySet(ext, ' ', 3); ext[3] = '\0';
+				for (int j = 0; j < StrLen(extRaw) && j < 3; j++) ext[j] = extRaw[j];
+
+				char* ExtensionRt = ext;
+
+				if (StrCmp(ExtensionRt, "NSH") == 0) Services->Display->setAttrs(0, 0x3);
+				else if (StrCmp(ExtensionRt, "BIN") == 0) Services->Display->setAttrs(0, 0x2);
+				else Services->Display->setAttrs(0, 0x7);
+
+				Services->Display->printg(route);
+				Services->Display->printg("  ");
+			}
+
+			GlobalServices->Memory->FreePool(StructFs);
+		}
+		else {
+			// leer boot sector
+			uint8_t sector0[512]; InternalDiskReadSector(0, sector0);
+
+			struct _FAT12_BootSector* bs = (struct _FAT12_BootSector*) sector0;
+			unsigned int root_start = bs->reserved_sectors + bs->num_fats * bs->fat_size_sectors;
+			unsigned int root_sectors = (bs->root_entries * 32) / bs->bytes_per_sector;
+			uint8_t root_buffer[512 * root_sectors];
+
+			// Leer todos los sectores del directorio raíz
+			for (int s = 0; s < root_sectors; s++) {
+				InternalDiskReadSector(root_start + s, root_buffer + s * bs->bytes_per_sector);
+			}
+
+			// Recorrer todas las entradas del directorio raíz
+			struct _FAT12_DirEntry* dir = (struct _FAT12_DirEntry*)root_buffer;
+			int total_entries = bs->root_entries;
+
+			for (int i = 0; i < total_entries; i++) {
+				if (dir[i].name[0] == 0x00 || dir[i].name[0] == 0xE5) continue;
+
+				if (
+					dir[i].name[8] == 'B' && dir[i].name[9] == 'I' && dir[i].name[10] == 'N'
+				)
+					Services->Display->setAttrs(0, 0x2);
+				else if (
+					dir[i].name[8] == 'N' && dir[i].name[9] == 'S' && dir[i].name[10] == 'H'
+				)
+						Services->Display->setAttrs(0, 0x3);
+				else
+					Services->Display->setAttrs(0, 0x7);
+
+				// Mostrar nombre y extensión
+				Services->Display->printg(dir[i].name);
+
+				Services->Display->setAttrs(0, 0x7);
+				Services->Display->printg(" + ");
+			}
+		}
+		Services->Display->printg("\n");
+	
 	}
 	else if (StrnCmp(command, "echo ", 5) == 0) { if (len == 5); else Services->Display->printg(command + 5);Services->Display->printg("\n"); }
 	else if (StrCmp(command, "prp") == 0){Services->Display->setAttrs(0, 10); Services->Display->printg("ModuKernel");Services->Display->setAttrs(0, 9); Services->Display->printg(":~");Services->Display->setAttrs(0, 7); Services->Display->printg("# ");}
 	else if (StrCmp(command, "reset") == 0) Services->Misc->Reset(0);
 	else if (StrCmp(command, "shutdown") == 0) Services->Misc->Reset(1);
 	else if (StrCmp(command, "") == 0);
-	else
-	{
-		if (len < 9)
-		{
-			char name[9];
+	else {
+        char name[9];
+        InternalMemorySet(name, ' ', 8);
+        name[8] = '\0';
+        for (int i = 0; i < len && i < 8; i++) name[i] = command[i];
 
-			// Rellenar con espacios (mejor práctica)
-			InternalMemorySet(name, ' ', 8);
-			name[8] = '\0';
+        void* buffer = 0;
+        int size = 0;
+        KernelStatus status;
 
-			// Copiar el comando a name
-			for (int i = 0; i < len && i < 8; i++)
-				name[i] = command[i];
+        // 1. Intentar BIN
+        FatFile file = Services->File->FindFile(name, "BIN");
+        status = Services->File->GetFile(file, &buffer, &size);
+        if (!_StatusError(status)) {
+            KernelStatus result = Services->Misc->RunBinary(buffer, size, Services);
+			return;
+        }
 
-			FatFile File = Services->File->FindFile(name, "BIN");
+        // 2. Intentar NSH
+        file = Services->File->FindFile(name, "NSH");
+        status = Services->File->GetFile(file, &buffer, &size);
+        if (!_StatusError(status)) {
+            char* text = (char*)buffer;
+            char* parts[120];
+            int n = StrSplit(text, parts, '\n');
+            for (int i = 0; i < n; i++) {
+                Services->Misc->Run(Services, parts[i], 0);
+            }
+            return;
+        }
 
-			void* buffer = 0;
-			int size = 0;
+        // 3. Intentar alias extendido
+        file = Services->File->OpenFile(command);
+        status = Services->File->GetFile(file, &buffer, &size);
+        if (!_StatusError(status)) {
+            KernelStatus result = Services->Misc->RunBinary(buffer, size, Services);
+            return;
+        }
 
-			KernelStatus Status = Services->File->GetFile(File, &buffer, &size);
-
-			#define USER_LOAD_ADDR ((uint8_t*)0x00400000)
-
-			typedef struct {
-				char magic[8];       // "ModuBin\0"
-				uint32_t entry;       // dirección de ErickMain
-				uint32_t bss_start;   // dirección inicio .bss
-				uint32_t bss_end;     // dirección fin .bss
-			} UserHeader;
-
-			if ((!_StatusError(Status)) && size >= sizeof(UserHeader)) {
-				// Copiar binario a su dirección de enlace
-				InternalMemoryCopy(USER_LOAD_ADDR, buffer, size);
-
-				// Leer encabezado
-				UserHeader* hdr = (UserHeader*)USER_LOAD_ADDR;
-				if (Services->Memory->CompareMemory(hdr->magic, "ModuBin", 7) != 0) {
-					Services->Display->printg("header magic invalido\n");
-				}
-
-				// Cero .bss
-				if (hdr->bss_end > hdr->bss_start) {
-					size_t bss_size = (size_t)(hdr->bss_end - hdr->bss_start);
-					InternalMemorySet((void*)hdr->bss_start, 0, bss_size);
-				}
-
-				// Ejecutar
-				typedef KernelStatus (*ProgramEntry)(KernelServices*);
-				ProgramEntry entry = (ProgramEntry)(uintptr_t)hdr->entry;
-				KernelStatus result = entry(Services);
-
-				char out[13];
-				IntToString(result, out);
-				Services->Display->printg("\nEl programa retorno = ");
-				Services->Display->printg(out);
-				Services->Display->printg("\n");
-			}
-			else
-			{
-				if (size == 0) Services->Display->printg("(size==0)\n");
-				Services->Display->printg("KernelStatus Status = ");
-				char error[13]; 
-				IntToString(Status, error);
-				Services->Display->printg(error);
-				Services->Display->printg("; // no se pudo leer\n");
-			}
-		}
+        Services->Display->printg("no se pudo leer archivo\n");
 	}
 }
 KernelStatus InternalMiniKernelProgram(KernelServices* Services)

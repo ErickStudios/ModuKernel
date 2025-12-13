@@ -28,6 +28,8 @@ typedef void (*KernelServicesExecuteCommand)(struct _KernelServices* Services, c
 typedef void (*KernelServicesGiveBirth)(struct _KernelServices*);
 // el tipo para apagar o reiniciar
 typedef KernelStatus (*KernelServicesReset)(int func);
+// el tipo para ejecutar binarios
+typedef KernelStatus (*KernelServicesRunBinary)(void* buffer, int size, struct _KernelServices* Services);
 // el tipo de servicios otros
 typedef struct _KernelMiscServices {
     // el servicio de comandos
@@ -36,6 +38,8 @@ typedef struct _KernelMiscServices {
     KernelServicesGiveBirth GiveBirth;
     // para reiniciar o apagar (0=reiniciar, 1=apagar)
     KernelServicesReset Reset;
+    // para ejecutar un binario
+    KernelServicesRunBinary RunBinary;
 } KernelMiscServices;
 // para los servicios principales
 typedef struct _KernelServices {

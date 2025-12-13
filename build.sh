@@ -28,7 +28,10 @@ mkfs.fat -F 12  build/disk.img
 sudo mkdir -p /mnt/disk_qemu
 sudo mount -o loop  build/disk.img /mnt/disk_qemu
 sudo cp disk/KERNEL.BIN /mnt/disk_qemu/
-sudo cp disk/CALC.BIN /mnt/disk_qemu/
+for file in disk/*; do
+    sudo cp "$file" /mnt/disk_qemu/ && echo "$file copiado"
+done
+
 ls -l /mnt/disk_qemu
 
 sudo umount /mnt/disk_qemu
