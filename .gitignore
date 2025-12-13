@@ -1,0 +1,5 @@
+# para vscode
+.vscode/
+
+# construcciones
+build/
