@@ -1,9 +1,4 @@
 #include <stdint.h>
-static uint16_t inw(uint16_t port) {
-    uint16_t ret;
-    __asm__ __volatile__("inw %1, %0" : "=a"(ret) : "Nd"(port));
-    return ret;
-}
 
 #define NULL 0
 
@@ -21,6 +16,12 @@ static void outb(uint16_t port, uint8_t val) {
 static inline void outw(unsigned short port, unsigned short value)
 {
     __asm__ __volatile__("outw %0, %1" : : "a"(value), "Nd"(port));
+}
+
+static uint16_t inw(uint16_t port) {
+    uint16_t ret;
+    __asm__ __volatile__("inw %1, %0" : "=a"(ret) : "Nd"(port));
+    return ret;
 }
 
 char* InternalReadLine();
