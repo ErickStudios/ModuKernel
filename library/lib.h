@@ -32,6 +32,12 @@ typedef GrandePositivo     DireccionAValor;
 #define EscaneoFlechaIzquierda KernelSimpleIoSpecKey(3)
 #define EscaneoFlechaDerecha KernelSimpleIoSpecKey(4)
 
+// para funciones rapidas
+#define GetArgs(Services,Count)                                             \
+    int count    = (int)(DireccionAValor)Services->Misc->Paramaters[1];     
+#define GetMagic(Services, Magic)                                           \
+    int Magic = *(int*)Services->Misc->Paramaters[0];
+
 // inicializa la libreria
 void InitializeLibrary(Sys* System)
 {

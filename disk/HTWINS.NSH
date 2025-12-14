@@ -1,4 +1,4 @@
-# htwins!
+# este es un comentario en ModuShell
+# hola gente un script aqui
 
-echo Ejecutando
 /bin/hw

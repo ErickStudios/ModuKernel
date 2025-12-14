@@ -527,6 +527,7 @@ void InternalSysCommandExecute(KernelServices* Services, char* command, int lena
 	int len = StrLen(command);
 
 	if (StrCmp(command, "cls") == 0) Services->Display->clearScreen();
+	else if (command[0] == '#') return;
 	else if (StrCmp(command ,"ls") == 0)
 	{
 		FatFile StructureFs = Services->File->FindFile("FSLST   ", "IFS");
@@ -638,6 +639,23 @@ void InternalSysCommandExecute(KernelServices* Services, char* command, int lena
 	else if (StrCmp(command, "prp") == 0){Services->Display->setAttrs(0, 10); Services->Display->printg("ModuKernel");Services->Display->setAttrs(0, 9); Services->Display->printg(":~");Services->Display->setAttrs(0, 7); Services->Display->printg("# ");}
 	else if (StrCmp(command, "reset") == 0) Services->Misc->Reset(0);
 	else if (StrCmp(command, "shutdown") == 0) Services->Misc->Reset(1);
+	else if (StrnCmp(command, "modush ", 7) == 0)
+	{
+		char* shell_file =command + 7;
+		void* buffer = NULL; int size = 0;
+
+        FatFile file = Services->File->OpenFile(shell_file);
+        KernelStatus status = Services->File->GetFile(file, &buffer, &size);
+
+        if (!_StatusError(status)) {
+			char* text = (char*)buffer; char* parts[120];
+            int n = StrSplit(text, parts, '\n');
+            for (int i = 0; i < n; i++) Services->Misc->Run(Services, parts[i], 0);
+            return;
+		}
+		
+		Services->Display->printg("no se pudo ejecutar");
+	}
 	else if (StrCmp(command, "time") == 0)
 	{
 		KernelDateTime Time;
@@ -660,6 +678,9 @@ void InternalSysCommandExecute(KernelServices* Services, char* command, int lena
 	}
 	else if (StrCmp(command, "") == 0);
 	else {
+		char* Params[128];
+		int ParamsCount = StrSplit(command, Params, ' ');
+
         char name[9];
         InternalMemorySet(name, ' ', 8);
         name[8] = '\0';
@@ -677,23 +698,30 @@ void InternalSysCommandExecute(KernelServices* Services, char* command, int lena
 			return;
         }
 
-        // 2. Intentar NSH
         file = Services->File->FindFile(name, "NSH");
         status = Services->File->GetFile(file, &buffer, &size);
         if (!_StatusError(status)) {
-            char* text = (char*)buffer;
-            char* parts[120];
+            char* text = (char*)buffer; char* parts[120];
             int n = StrSplit(text, parts, '\n');
-            for (int i = 0; i < n; i++) {
-                Services->Misc->Run(Services, parts[i], 0);
-            }
+            for (int i = 0; i < n; i++) Services->Misc->Run(Services, parts[i], 0);
             return;
         }
 
         // 3. Intentar alias extendido
-        file = Services->File->OpenFile(command);
+        file = Services->File->OpenFile(Params[0]);
         status = Services->File->GetFile(file, &buffer, &size);
         if (!_StatusError(status)) {
+			*Services->Misc->ParamsCount = ParamsCount + 2; // tipo + count + args
+
+			int Magic = 0x043b;
+			Services->Misc->Paramaters[0] = (void*)(intptr_t)Magic;   // guardar valor como entero
+
+			Services->Misc->Paramaters[1] = (void*)(intptr_t)ParamsCount; // cantidad
+
+			for (int i = 0; i < ParamsCount; i++) {
+				Services->Misc->Paramaters[i + 2] = (void*)Params[i]; // cada string
+			}
+			
             KernelStatus result = Services->Misc->RunBinary(buffer, size, Services);
             return;
         }
