@@ -5,55 +5,89 @@
 #include "MemoryServices.h"
 #include "IOServices.h"
 #include "DiskServices.h"
-// status de error
+/* codigos de error entre otros */
 typedef enum _KernelStatus {
-    // que se pudo
-    KernelStatusSuccess = 0,
-    // que no se encontro
-    KernelStatusNotFound = 1,
-    // que fue tan desastrozo que nisiquiera se molesto en decirlo
-    KernelStatusDisaster = 2,
-    // que se quedo congelado
-    KernelStatusInfiniteLoopTimeouted = 3,
-    // que no hay presupuesto
-    KernelStatusNoBudget = 4,
-    // error de memoria
-    KernelStatusMemoryRot = 5,
-    // error de disco
-    KernelStatusDiskServicesDiskErr = 6
+    /* se puede */
+    KernelStatusSuccess,
+    /* no se encontro */
+    KernelStatusNotFound,
+    /* que fue tan desastrozo que nisiquiera se ModuKernel molesto en decir que diablos paso */
+    KernelStatusDisaster,
+    /* que se quedo congelado y lo unico que te salvo fue un timeout */
+    KernelStatusInfiniteLoopTimeouted,
+    /* que no hay presupuesto para mas memoria */
+    KernelStatusNoBudget,
+    /* error de memoria que no se puede leer o escribir */
+    KernelStatusMemoryRot,
+    /* error del disco que no se puede leer o escribir */
+    KernelStatusDiskServicesDiskErr,
+    /* el parametro que se mando fue uno que no es valido */
+    KernelStatusInvalidParam
 } KernelStatus;
-// el tipo para ejecutar un comando
+/* el tipo de hora y fecha que es una estructura para hacerlo mas limpio */
+typedef struct _KernelDateTime {
+    /* contiene el año actual */
+    int year;
+    /* contiene el mes actual */
+    int month; 
+    /* contiene el dia actual */
+    int day;
+    /* contiene la hora actual */
+    int hour;
+    /* contiene el minuto actual */
+    int minute;
+    /* contiene el segundo actual */
+    int second;
+} KernelDateTime;
+/* el tipo para ejecutar un comando */
 typedef void (*KernelServicesExecuteCommand)(struct _KernelServices* Services, char* command, int len);
-// el tipo para engendrar servicios
+/* el tipo para engendrar servicios */
 typedef void (*KernelServicesGiveBirth)(struct _KernelServices*);
-// el tipo para apagar o reiniciar
+/* el tipo para apagar o reiniciar */
 typedef KernelStatus (*KernelServicesReset)(int func);
-// el tipo para ejecutar binarios
+/* el tipo para ejecutar binarios */
 typedef KernelStatus (*KernelServicesRunBinary)(void* buffer, int size, struct _KernelServices* Services);
-// el tipo de servicios otros
+/* el tipo para obtener la fecha y hora */
+typedef void (*KernelServicesGetTimeDate)(KernelDateTime* Time);
+/* el tipo de servicios otros */
 typedef struct _KernelMiscServices {
-    // el servicio de comandos
+    /* funcion para ejecutar un comando desde la shell, requiere como 
+    parametro el puntero a los servicios de kernel, el comando en texto,
+    y una longitud que de hecho no se usa pero esta por compatibilidad*/
     KernelServicesExecuteCommand Run;
-    // crea uno nuevo
+    /* funcion para crear una nueva estructura de servicios de kernel,
+    necesita como parametro un puntero a los servicios a inicializar */
     KernelServicesGiveBirth GiveBirth;
-    // para reiniciar o apagar (0=reiniciar, 1=apagar)
+    /* funcion para, requiere un unico parametro que es la accion de poder 
+    reiniciar o apagar (0=reiniciar, 1=apagar) , retorna como le fue*/
     KernelServicesReset Reset;
-    // para ejecutar un binario
+    /* funcion para ejecutar un binario, el primer parametro es el buffer al
+    contenido del binario, el segundo es el tamaño, y el tercero es el puntero 
+    que el binario recibira en su main para conectarlo con el kernel */
     KernelServicesRunBinary RunBinary;
+    /* funcion para obtener la fecha y hora, como unico parametro usa
+    un puntero a la estructura del tiempo*/
+    KernelServicesGetTimeDate GetTime;
+    /* variable que apunta a los parametros extras con los cuales se ejecuta
+    un programa */
+    void*** Paramaters;
+    /* variable que apunta a la longitud de los parametros */
+    int* ParamsCount;
 } KernelMiscServices;
-// para los servicios principales
+/* esta estructura contiene la tabla de servicios del kernel 
+para que sea mas comprensible , organizado y facil de usar */
 typedef struct _KernelServices {
-    // version de servicios
+    /* propiedad que contiene un puntero a la version actual de los servicios */
     unsigned int* ServicesVersion;
-    // para la pantalla
+    /* servicio para controlar la pantalla y la consola*/
     DisplayServices* Display;
-    // para la memoria
+    /* servicio para administrar memoria dinamica */
     MemoryServices* Memory;
-    // el servicio de I/O
+    /* servicio para entrada y salida de dispositivos */
     IoServices* InputOutpud;
-    // el servicio de disco
+    /* servicio para administracion de FAT12 y FAT12 extendido */
     DiskServices* File;
-    // servicios miscelianos
+    /* servicios miscelianos que no encajan en ninguna otra categoria */
     KernelMiscServices* Misc;
 } KernelServices;
 #endif

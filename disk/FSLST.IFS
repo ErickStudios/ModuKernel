@@ -1,3 +1,8 @@
+# este es el archivo del filesystem para estructura
+# puedes editarlo para añadir mas directorios
+
 /bin/calculator;CALC;BIN;
 /bin/hw;KERNEL;BIN;
 /scripts/htwins.sh;HTWINS;NSH
+
+/dev/drv0;DRV0IN;BIN;

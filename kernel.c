@@ -18,11 +18,33 @@ KernelServices* GlobalServices;
 // mayusculas y minusculas
 char LowerUpper = 0;
 // version del sistema
-int InternalServicesVersion = 10;
+int InternalServicesVersion = 20;
+
+// parametros
+void** InternalParams;
+int InternalParamsCount;
 
 static BlockHeader* heap_start = (BlockHeader*)&_heap_start;
 static BlockHeader* free_list = NULL;
-
+uint8_t ReadRTC(uint8_t reg) { outb(0x70, reg); return inb(0x71); }
+uint8_t BCDtoBin(uint8_t bcd) {return ((bcd >> 4) * 10) + (bcd & 0x0F);}
+void PrintStatus(KernelServices* Services, char* status, char* text)
+{
+	Services->Display->printg("[ ");
+	Services->Display->setAttrs(0, 0x3);
+	Services->Display->printg(status);
+	Services->Display->setAttrs(0, 0x7);
+	Services->Display->printg(" ]    ");
+	Services->Display->printg(text);
+}
+void InternalGetDateTime(KernelDateTime* Time) {
+    Time->second = BCDtoBin(ReadRTC(0x00));
+    Time->minute = BCDtoBin(ReadRTC(0x02));
+    Time->hour   = BCDtoBin(ReadRTC(0x04));
+    Time->day    = BCDtoBin(ReadRTC(0x07));
+    Time->month  = BCDtoBin(ReadRTC(0x08));
+    Time->year   = 2000 + BCDtoBin(ReadRTC(0x09));
+}
 void InitHeap() 
 {
     free_list = heap_start;
@@ -377,6 +399,9 @@ void InitializeKernel(KernelServices* Services)
     Services->Misc->Run       = &InternalSysCommandExecute;
 	Services->Misc->Reset	  = &InternalKernelReset;
 	Services->Misc->RunBinary = &InternalRunBinary;
+	Services->Misc->GetTime   = &InternalGetDateTime;
+	Services->Misc->Paramaters= &InternalParams;
+	Services->Misc->ParamsCount=&InternalParamsCount;
     Services->ServicesVersion = &InternalServicesVersion;
 
     // pantalla
@@ -589,10 +614,50 @@ void InternalSysCommandExecute(KernelServices* Services, char* command, int lena
 		Services->Display->printg("\n");
 	
 	}
+	else if (StrnCmp(command, "drvload ", 8) == 0)
+	{
+		char* drv_path = command + 8;
+
+		int Magic = 0x3a5b;
+		Services->Misc->Paramaters[0] = &Magic;
+
+		void* buffer = NULL;
+		int size = 0;
+
+        FatFile file = Services->File->OpenFile(drv_path);
+        KernelStatus status = Services->File->GetFile(file, &buffer, &size);
+
+        if (!_StatusError(status)) {
+            KernelStatus result = Services->Misc->RunBinary(buffer, size, Services);
+        }
+
+		Magic = 0x043b;
+		Services->Misc->Paramaters[0] = &Magic;
+	}
 	else if (StrnCmp(command, "echo ", 5) == 0) { if (len == 5); else Services->Display->printg(command + 5);Services->Display->printg("\n"); }
 	else if (StrCmp(command, "prp") == 0){Services->Display->setAttrs(0, 10); Services->Display->printg("ModuKernel");Services->Display->setAttrs(0, 9); Services->Display->printg(":~");Services->Display->setAttrs(0, 7); Services->Display->printg("# ");}
 	else if (StrCmp(command, "reset") == 0) Services->Misc->Reset(0);
 	else if (StrCmp(command, "shutdown") == 0) Services->Misc->Reset(1);
+	else if (StrCmp(command, "time") == 0)
+	{
+		KernelDateTime Time;
+		Services->Misc->GetTime(&Time);
+
+		char Hour[3];
+		char Minute[3];
+		char Second[3];
+
+		IntToString2Digits(Time.hour, Hour);
+		IntToString2Digits(Time.minute, Minute);
+		IntToString2Digits(Time.second, Second);
+
+		Services->Display->printg(Hour);
+		Services->Display->printg(":");
+		Services->Display->printg(Minute);
+		Services->Display->printg(":");
+		Services->Display->printg(Second);
+		Services->Display->printg("\n");
+	}
 	else if (StrCmp(command, "") == 0);
 	else {
         char name[9];
@@ -652,16 +717,38 @@ KernelStatus InternalMiniKernelProgram(KernelServices* Services)
 }
 void k_main() 
 {
+	// etapa de arranque prematura
+
 	InitHeap();
     KernelServices Services;
 
 	InitializeKernel(&Services);
 
+	// etapa de arranque
+
     Services.Display->Set(Services.Display);
     Services.Display->setAttrs(0, 7);
     Services.Display->clearScreen();
 
-    InternalMiniKernelProgram(&Services);
+	// etapa de arranque ya listo
+
+	Services.Display->setCursorPosition(0,0);
+
+	for (int i=0; i < 12; i++) Services.Display->printg("\n");
+
+	Services.Display->printg("           M o d u K e r n e l #                      ");
+
+	Services.Display->setCursorPosition(0,0);
+
+	PrintStatus(&Services, "KSucces", "Entrando a etapa de arranque listo\n");
+	PrintStatus(&Services, "Mensaje", "Presione enter para continuar\n");
+	PrintStatus(&Services, "Mensaje", "Esta es la pantalla de bloqueo de ModuKernel\n");
+	
+	char* action = Services.InputOutpud->ReadLine();
+
+	Services.Display->clearScreen();
+
+	InternalMiniKernelProgram(&Services);
 }
 KernelStatus ProcessCrtByFile(char* name, char* ext, KernelServices* Services)
 {

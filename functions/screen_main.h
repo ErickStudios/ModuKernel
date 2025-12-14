@@ -1,20 +1,20 @@
-// escritura y fuente
+/* escritura y fuente */
 char* text_attr;
 
-// columna seleccionada
+/* columna seleccionada */
 int* row_selected = 0;
-// linea seleccionada
+/* linea seleccionada */
 int* line_selected = 0;
 
-// limpia la pantalla
+/* limpia la pantalla */
 void InternalClearScreen();
-// imprime algo requiriendo una linea
+/* imprime algo requiriendo una linea */
 void InternalPrintg(char *message, unsigned int line);
-// imprime algo normalmente
+/* imprime algo normalmente */
 void InternalPrintgNonLine(char *message);
-// ajustar posicion del cursor
+/* ajustar posicion del cursor */
 void InternalCursorPos(int x, int y);
-// para ajustar
+/* para ajustar */
 void InternalSetActualDisplayService(DisplayServices* Serv);
-// para ajustar atributos
+/* para ajustar atributos */
 void InternalSetAttriubtes(char bg, char fg);

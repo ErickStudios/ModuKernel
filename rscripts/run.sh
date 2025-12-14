@@ -1,3 +1,5 @@
+cd ..
+
 echo Bienvenido a ModuKernel ahorita mismo se activo el modo sin compilar
 
 # arranca qemu

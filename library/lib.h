@@ -24,6 +24,8 @@ typedef unsigned short     CortoPositivo;
 typedef unsigned int       EnteroPositivo;
 typedef unsigned long long GrandePositivo;
 
+typedef GrandePositivo     DireccionAValor;
+
 // teclas
 #define EscaneoFlechaArriba KernelSimpleIoSpecKey(1)
 #define EscaneoFlechaAbajo KernelSimpleIoSpecKey(2)

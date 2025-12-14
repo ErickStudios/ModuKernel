@@ -10,11 +10,7 @@ section .text
 	dd - (0x1BADB002 + 0x00)	;checksum. m+f+c should be zero
 
 global start
-extern k_main	;k_main is defined in the kernel.c file
-; lee un sector del disco
-; entrada: ES:BX = buffer, CH = cilindro, CL = sector, DH = cabeza, DL = drive
-; salida: CF=0 éxito
-global bios_read_sector
+extern k_main	
 
 start:
 	cli  ; stop interrupts

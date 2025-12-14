@@ -1,3 +1,4 @@
-# htwins es algo
+# htwins!
 
-echo Htwins!
+echo Ejecutando
+/bin/hw

@@ -1,38 +1,60 @@
 #ifndef DisplayServicesDotH
 #define DisplayServicesDotH
-// el tipo
+/* el tipo
 struct _DisplayServices;
-// el tipo de impresion interna
+/* el tipo de impresion interna */
 typedef void (*KernelSimpleDisplayPrintgInternal)(char* msg, unsigned int line);
-// el tipo de impresion
+/* el tipo de impresion */
 typedef void (*KernelSimpleDisplayPrintg)(char* msg);
-// ir a
+/* ir a */
 typedef void (*KernelSimpleDisplayGoto)(int col, int row);
-// el tipo de limpieza
+/* el tipo de limpieza */
 typedef void (*KernelSimpleDisplayClearScreen)();
-// el tipo de atributos
+/* el tipo de atributos */
 typedef void (*KernelSimpleDisplaySetAttrs)(char bg, char fg);
-// el tipo de setteo
+/* el tipo de setteo */
 typedef void (*KernelSimpleDisplaySetAsDefault)(struct _DisplayServices* this);
-// el tipo de servicios de pantalla
+/* el tipo de servicios de pantalla */
 typedef struct _DisplayServices {
-    // la linea actual
+    /* variable que contiene la linea actual donde el cursor de escritura de
+    printg se encuentra ubicado */
     int CurrentLine;
-    // el caracter actual
+    /* variable que contiene la colummna actual donde el cursor de escritura de
+    printg se encuentra ubicado */
     int CurrentCharacter;
-    // el atributo actual
+    /* variable que contiene el atributo actual Fondo y Texto que el printg
+    utilizara para imprimir */
     char CurrentAttrs;
-    // para seleccionar
+    /* funcion que ajusta los punteros que usa printg a las propiedades CurrentLine
+    , CurrentCharacter y CurrentAttrs para que printg los obtenga automaticamente ,
+    no se preocupen, el kernel ya hace esto por defecto durante el arranque asi que
+    a menos de que requieran otro servicio de display paralelo no van a tener
+    que usar manualmente esta funcion, esta funcion contiene un parametro que es
+    el puntero a esta estructura */
     KernelSimpleDisplaySetAsDefault Set;
-    // para imprimir
+    /* funcion que es la funcion basica de impresion que no es automatica y
+    requiere como parametro ademas del texto de en ascii el parametro a la linea
+    donde se imprimira el texto, esta funcion no usa los parametros y punteros
+    de atributos de color y siempre imprimira en 0x07 (color gris en fondo negro) */
     KernelSimpleDisplayPrintgInternal printg_i;
-    // para imprimir sin necesitar la linea
+    /* funcion para imprimir, esta es la central y mas facil de usar que todos
+    deben usar si es que el kernel ya esta inicializado y los servicios de display 
+    ya esten despiertos, requiere como unico parametro el texto que esta en formato
+    ascii */
     KernelSimpleDisplayPrintg printg;
-    // para limpiar la pantalla
+    /* funcion para limpiar la pantalla de la consola */
     KernelSimpleDisplayClearScreen clearScreen;
-    // para ir a algun lado
+    /* funcion para establezer la posicion del cursor de printg, requiere como
+    parametro la columna (la posicion en x) y la linea (la posicion y), esta funcion
+    setea automaticamente los punteros que apuntan a la estructura de servicios de 
+    display que se usa actualmente, puedes cambiarla con el metodo Set en esta
+    misma estructura */
     KernelSimpleDisplayGoto setCursorPosition;
-    // ajustar attributos
-    KernelSimpleDisplaySetAttrs setAttrs;
+    /* funcion para ajustar los atributos del texto y fondo manualmente de forma
+    mas facil sin usar offsets, requiere como parametros un int8 que contiene el
+    color del fondo (0x0 a 0xF) y el segundo parametro es otro int8 que contiene
+    el color del texto (0x0 a 0xF), esto ajusta los punteros a la estructura
+    de display actual que se puede cambiar con la funcion Set */
+    KernelSimpleDisplaySetAttrs setAttrs; 
 } DisplayServices;
 #endif

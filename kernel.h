@@ -19,6 +19,12 @@ static inline void outw(unsigned short port, unsigned short value)
 {
     __asm__ __volatile__("outw %0, %1" : : "a"(value), "Nd"(port));
 }
+void IntToString2Digits(int value, char* out) {
+    out[0] = '0' + (value / 10);
+    out[1] = '0' + (value % 10);
+    out[2] = '\0';
+}
+
 
 static uint16_t inw(uint16_t port) {
     uint16_t ret;
