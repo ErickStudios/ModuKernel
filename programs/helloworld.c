@@ -1,4 +1,4 @@
-// hello_world.c alias KERNEL.BIN
+// helloworld.c
 #include "../library/lib.h"
 
 KernelStatus ErickMain(KernelServices* Services)

@@ -146,6 +146,7 @@ char* InternalReadLine()
 			}
 		}
 		else {
+			if (key == KernelSimpleIoFuncKey(1)) key = '_';
 			// el caracter
 			char buff[2] = { key , 0};
 			// si no es enter agregar caracter
@@ -568,7 +569,7 @@ void InternalSysCommandExecute(KernelServices* Services, char* command, int lena
 				else Services->Display->setAttrs(0, 0x7);
 
 				Services->Display->printg(route);
-				Services->Display->printg("  ");
+				Services->Display->printg("\n");
 			}
 
 			GlobalServices->Memory->FreePool(StructFs);

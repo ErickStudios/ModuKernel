@@ -1,9 +1,9 @@
 #ifndef IOServicesDotH
 #define IOServicesDotH
 /* para teclas especiales */
-#define KernelSimpleIoSpecKey(Id) (0xC0 + Id)
+#define KernelSimpleIoSpecKey(Id) (0xC0 | Id)
 /* para teclas de funcion */
-#define KernelSimpleIoFuncKey(Id) (0xD0 + Id)
+#define KernelSimpleIoFuncKey(Id) (0xD0 | Id)
 /* el tipo de input */
 typedef unsigned char (*KernelSimpleIoInput)(unsigned short port);
 /* el tipo de outpud */

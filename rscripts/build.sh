@@ -16,9 +16,6 @@ gcc -m32 -c kernel.c -o build/kc.o
 
 # compilar programa de usuario a binario crudo
 mkdir -p disk
-compile_raw programs/hello_world.c disk/KERNEL.BIN
-compile_raw programs/calculator.c disk/CALC.BIN
-compile_raw drivers/drv0.c disk/DRV0IN.BIN
 read e
 # linkear kernel
 ld -m elf_i386 -T ABI/kernel_link.ld -o build/kernel build/kasm.o build/kc.o
@@ -31,7 +28,67 @@ mkfs.fat -F 12  build/disk.img
 sudo mkdir -p /mnt/disk_qemu
 sudo mount -o loop  build/disk.img /mnt/disk_qemu
 sudo cp disk/KERNEL.BIN /mnt/disk_qemu/
-for file in disk/*; do
+
+afaf=0
+filea=""
+
+# eliminar todo de disk
+rm -rf disk/*
+
+# el sistema de archivos
+echo "" > disk/FSLST.IFS
+
+# para los programas
+for file in programs/*.c; do
+    # extraer el nombre
+    nameq=$(basename "$file")
+    name="${nameq%.*}"
+
+    # compilar
+    compile_raw $file disk/BC$afaf.BIN
+
+    # añadir al mapa
+    echo "/bin/$name;BC$afaf;BIN;" >> disk/FSLST.IFS
+    # siguiente
+    let afaf=afaf+1
+done
+
+afaf=0
+
+# para los drivers
+for file in drivers/*.c; do
+    # extraer el nombre
+    nameq=$(basename "$file")
+    name="${nameq%.*}"
+
+    # compilar
+    compile_raw $file disk/DV$afaf.BIN
+
+    # añadir al mapa
+    echo "/dev/$name;DV$afaf;BIN;" >> disk/FSLST.IFS
+    # siguiente
+    let afaf=afaf+1
+done
+
+afaf=0
+
+# para el usuario
+for file in usr/*; do
+    # extraer el nombre
+    name=$(basename "$file")
+
+    # compilar
+    cp $file disk/SR$afaf.SRN
+
+    # añadir al mapa
+    echo "/home/$name;SR$afaf;SRN;" >> disk/FSLST.IFS
+    # siguiente
+    let afaf=afaf+1
+done
+
+echo $filea
+
+for file in disk/*; do 
     sudo cp "$file" /mnt/disk_qemu/ && echo "$file copiado"
 done
 

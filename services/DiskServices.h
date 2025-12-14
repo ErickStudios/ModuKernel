@@ -44,7 +44,7 @@ typedef struct _DiskServices {
     esta funcion requiere como unico parametro una ruta tipo 
     '/ruta/a/archivo', sobre como funciona pues hay un archivo interno
     llamado FSLST.IFS que contiene un mapa con las direcciones complejas
-    de los archivos aunque itnernamente esta funcion esconde lo mas posible
+    de los archivos aunque internamente esta funcion esconde lo mas posible
     las limitaciones de Fat12, si quieres usarlo de manera mas simple pues
     utiliza esta funcion, retorna una estructura con informacion del archivo 
     y el bootsector en el cual esta  */
