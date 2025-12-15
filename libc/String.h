@@ -133,4 +133,15 @@ int StrSplit(char* str, char** buffer, char splitter)
 
     return count;
 }
+// devuelve un puntero al primer carácter encontrado, o NULL si no existe
+char* StrChr(const char* str, int ch) {
+    while (*str) {
+        if (*str == (char)ch) {
+            return (char*)str; // encontrado
+        }
+        str++;
+    }
+    return 0; // no encontrado
+}
+
 #endif

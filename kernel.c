@@ -24,6 +24,11 @@ int InternalServicesVersion = 20;
 void** InternalParams;
 int InternalParamsCount;
 
+// archivo de shell y directorio
+char CurrentWorkDirectory[128] = "/";
+unsigned int CwdCurrentCharacter = 1;
+int CwdLevelDir = 1;
+
 static BlockHeader* heap_start = (BlockHeader*)&_heap_start;
 static BlockHeader* free_list = NULL;
 uint8_t ReadRTC(uint8_t reg) { outb(0x70, reg); return inb(0x71); }
@@ -536,16 +541,54 @@ void InternalSysCommandExecute(KernelServices* Services, char* command, int lena
 
 	if (StrCmp(command, "cls") == 0) Services->Display->clearScreen();
 	else if (command[0] == '#') return;
+	else if (StrnCmp(command, "cd ", 3) == 0)
+	{
+		char* directory = command + 3;
+
+		if (directory[0] == 0) return;
+
+		if (StrCmp(directory, "..") == 0) {
+			if (CwdCurrentCharacter > 1) { // evita borrar más allá de raíz
+				CurrentWorkDirectory[(CwdCurrentCharacter--)-1] = 0;
+				while (CwdCurrentCharacter > 0 && CurrentWorkDirectory[CwdCurrentCharacter] != '/')
+					CurrentWorkDirectory[CwdCurrentCharacter--] = 0;
+
+				// si no estamos en raíz, dejar el slash final
+				if (CwdCurrentCharacter == 0) CurrentWorkDirectory[1] = 0; 
+				else CurrentWorkDirectory[CwdCurrentCharacter+1] = 0;
+				
+				CwdCurrentCharacter++;
+			}
+
+			CwdLevelDir--;
+		}
+		else {
+			unsigned int DirectoryLen = StrLen(directory);
+
+			for (int i=0; i < DirectoryLen; i++) CurrentWorkDirectory[CwdCurrentCharacter++] = directory[i];
+		
+			CwdLevelDir++;
+			CurrentWorkDirectory[CwdCurrentCharacter++] = '/';
+			CurrentWorkDirectory[CwdCurrentCharacter] = 0;
+		}
+	}
 	else if (StrCmp(command ,"ls") == 0)
 	{
 		FatFile StructureFs = Services->File->FindFile("FSLST   ", "IFS");
 		void* StructFs; int FsSize;
 		KernelStatus StructureFound = Services->File->GetFile(StructureFs, &StructFs, &FsSize);
 
+		char Recorrer = 0;
+		char MaxRecorrer = 5;
+		char* Directory = CurrentWorkDirectory;
+
 		if (!_StatusError(StructureFound))
 		{
 			char* text = (char*)StructFs;
 			char* parts[128]; // espacio para líneas
+
+			char* putedDirs[128];
+			int indexPutDirs = 0;
 
 			int n = StrSplit(text, parts, '\n');
 
@@ -575,8 +618,49 @@ void InternalSysCommandExecute(KernelServices* Services, char* command, int lena
 				else if (StrCmp(ExtensionRt, "BIN") == 0) Services->Display->setAttrs(0, 0x2);
 				else Services->Display->setAttrs(0, 0x7);
 
-				Services->Display->printg(route);
-				Services->Display->printg("\n");
+				if (StrnCmp(route, CurrentWorkDirectory, CwdCurrentCharacter) == 0) {
+					char* rtm = route + CwdCurrentCharacter;
+
+					// ¿hay otro '/' en rtm?
+					char* slash = StrChr(rtm, '/');
+					if (slash) {
+						int len = slash - rtm;
+						char* temp = AllocatePool(len + 1);
+						InternalMemoryCopy(temp, rtm, len);
+						temp[len] = '\0';
+
+						int founded = 0;
+						for (int a=0; a < indexPutDirs; a++) {
+							if (StrCmp(putedDirs[a], temp) == 0) {
+								founded = 1;
+								break;
+							}
+						}
+
+						if (!founded) {
+							Services->Display->setAttrs(0, 9);
+
+							putedDirs[indexPutDirs++] = temp;
+							Services->Display->printg(temp);
+							Services->Display->printg("/    ");
+							Recorrer++;
+						} else {
+							GlobalServices->Memory->FreePool(temp); // no lo guardes si ya estaba
+						}
+					} else {
+						Services->Display->printg(rtm);
+						Services->Display->printg("    ");
+						Recorrer++;
+					}
+
+					if (Recorrer == MaxRecorrer)
+					{
+						Recorrer = 0;
+						Services->Display->printg("\n");
+					}
+
+				}
+
 			}
 
 			GlobalServices->Memory->FreePool(StructFs);
@@ -644,7 +728,17 @@ void InternalSysCommandExecute(KernelServices* Services, char* command, int lena
 		Services->Misc->Paramaters[0] = &Magic;
 	}
 	else if (StrnCmp(command, "echo ", 5) == 0) { if (len == 5); else Services->Display->printg(command + 5);Services->Display->printg("\n"); }
-	else if (StrCmp(command, "prp") == 0){Services->Display->setAttrs(0, 10); Services->Display->printg("ModuKernel");Services->Display->setAttrs(0, 9); Services->Display->printg(":~");Services->Display->setAttrs(0, 7); Services->Display->printg("# ");}
+	else if (StrCmp(command, "prp") == 0)
+	{
+		Services->Display->setAttrs(0, 10); 
+		Services->Display->printg("ModuKernel");
+		Services->Display->setAttrs(0, 9); 
+		Services->Display->printg(":");
+		char* Directory = CurrentWorkDirectory;
+		Services->Display->printg(Directory);
+		Services->Display->setAttrs(0, 7); 
+		Services->Display->printg("# ");
+	}
 	else if (StrCmp(command, "reset") == 0) Services->Misc->Reset(0);
 	else if (StrCmp(command, "shutdown") == 0) Services->Misc->Reset(1);
 	else if (StrnCmp(command, "modush ", 7) == 0)
@@ -652,7 +746,16 @@ void InternalSysCommandExecute(KernelServices* Services, char* command, int lena
 		char* shell_file =command + 7;
 		void* buffer = NULL; int size = 0;
 
-        FatFile file = Services->File->OpenFile(shell_file);
+		char* Directory = CurrentWorkDirectory;
+		size_t dirLen = StrLen(Directory);
+		size_t fileLen = StrLen(shell_file);
+
+		char* NameExtended = AllocatePool(sizeof(char) * (dirLen + fileLen + 2));
+		InternalMemoryCopy(NameExtended, Directory, dirLen);
+		InternalMemoryCopy(NameExtended + dirLen, shell_file, fileLen);
+		NameExtended[dirLen + fileLen] = '\0';
+
+        FatFile file = Services->File->OpenFile(NameExtended);
         KernelStatus status = Services->File->GetFile(file, &buffer, &size);
 
         if (!_StatusError(status)) {
@@ -663,6 +766,30 @@ void InternalSysCommandExecute(KernelServices* Services, char* command, int lena
 		}
 		
 		Services->Display->printg("no se pudo ejecutar");
+	}
+	else if (StrnCmp(command, "cat ", 4) == 0)
+	{
+		char* shell_file =command + 4;
+		void* buffer = NULL; int size = 0;
+
+		char* Directory = CurrentWorkDirectory;
+		size_t dirLen = StrLen(Directory);
+		size_t fileLen = StrLen(shell_file);
+
+		char* NameExtended = AllocatePool(sizeof(char) * (dirLen + fileLen + 2));
+		InternalMemoryCopy(NameExtended, Directory, dirLen);
+		InternalMemoryCopy(NameExtended + dirLen, shell_file, fileLen);
+		NameExtended[dirLen + fileLen] = '\0';
+
+        FatFile file = Services->File->OpenFile(NameExtended);
+        KernelStatus status = Services->File->GetFile(file, &buffer, &size);
+
+        if (!_StatusError(status)) {
+			char* text = (char*)buffer; char* parts[120];
+			Services->Display->printg(text);
+			Services->Display->printg("\n");
+			return;
+		}
 	}
 	else if (StrCmp(command, "time") == 0)
 	{
@@ -715,8 +842,17 @@ void InternalSysCommandExecute(KernelServices* Services, char* command, int lena
             return;
         }
 
+		char* Directory = CurrentWorkDirectory;
+		size_t dirLen = StrLen(Directory);
+		size_t fileLen = StrLen(Params[0]);
+
+		char* NameExtended = AllocatePool(sizeof(char) * (dirLen + fileLen + 2));
+		InternalMemoryCopy(NameExtended, Directory, dirLen);
+		InternalMemoryCopy(NameExtended + dirLen, Params[0], fileLen);
+		NameExtended[dirLen + fileLen + 1] = '\0';
+
         // 3. Intentar alias extendido
-        file = Services->File->OpenFile(Params[0]);
+        file = Services->File->OpenFile(NameExtended);
         status = Services->File->GetFile(file, &buffer, &size);
         if (!_StatusError(status)) {
 			*Services->Misc->ParamsCount = ParamsCount + 2; // tipo + count + args

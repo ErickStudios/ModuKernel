@@ -5,3 +5,8 @@
 /dev/drv0;DV0;BIN;
 /home/myScript.sh;SR0;SRN;
 /home/nota.txt;SR1;SRN;
+/home/test1.txt;SR2;SRN;
+/home/test2.txt;SR3;SRN;
+/home/test3.txt;SR4;SRN;
+/home/test4.txt;SR5;SRN;
+/home/test5.txt;SR6;SRN;
