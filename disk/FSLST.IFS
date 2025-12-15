@@ -1,6 +1,7 @@
 
-/bin/calculator;BC0;BIN;
-/bin/helloworld;BC1;BIN;
+/bin/bench;BC0;BIN;
+/bin/calculator;BC1;BIN;
+/bin/helloworld;BC2;BIN;
 /dev/drv0;DV0;BIN;
 /home/myScript.sh;SR0;SRN;
 /home/nota.txt;SR1;SRN;

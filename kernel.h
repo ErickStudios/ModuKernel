@@ -25,6 +25,7 @@ void IntToString2Digits(int value, char* out) {
     out[2] = '\0';
 }
 
+unsigned long long InternalGetNumberOfTicksFromMachineStart();
 
 static uint16_t inw(uint16_t port) {
     uint16_t ret;

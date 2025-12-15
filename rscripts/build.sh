@@ -96,5 +96,12 @@ ls -l /mnt/disk_qemu
 
 sudo umount /mnt/disk_qemu
 
+cp build/kernel iso/boot/kernel
+
+grub-mkrescue -o build/ModuKernel.iso iso
+
 # arrancar QEMU
-qemu-system-i386 -kernel ./build/kernel -hda ./build/disk.img -m 512M
+#qemu-system-i386 -cdrom build/ModuKernel.iso -m 512M 
+    # no funciona
+qemu-system-i386 -kernel ./build/kernel -hda build/disk.img -m 512M
+#-kernel ./build/kernel  -hda build/disk.img -m 512M

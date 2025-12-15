@@ -28,6 +28,12 @@ static BlockHeader* heap_start = (BlockHeader*)&_heap_start;
 static BlockHeader* free_list = NULL;
 uint8_t ReadRTC(uint8_t reg) { outb(0x70, reg); return inb(0x71); }
 uint8_t BCDtoBin(uint8_t bcd) {return ((bcd >> 4) * 10) + (bcd & 0x0F);}
+unsigned long long InternalGetNumberOfTicksFromMachineStart()
+{
+    unsigned long lo, hi;
+    __asm__ __volatile__("rdtsc" : "=a"(lo), "=d"(hi));
+    return (( unsigned long long)hi << 32) | lo;
+}
 void PrintStatus(KernelServices* Services, char* status, char* text)
 {
 	Services->Display->printg("[ ");
@@ -403,6 +409,7 @@ void InitializeKernel(KernelServices* Services)
 	Services->Misc->GetTime   = &InternalGetDateTime;
 	Services->Misc->Paramaters= &InternalParams;
 	Services->Misc->ParamsCount=&InternalParamsCount;
+	Services->Misc->GetTicks  = &InternalGetNumberOfTicksFromMachineStart;
     Services->ServicesVersion = &InternalServicesVersion;
 
     // pantalla
@@ -769,6 +776,7 @@ void k_main()
 
 	Services.Display->setCursorPosition(0,0);
 
+	Services.Display->printg("ModuKernel - https://github.com/ErickStudios/ModuKernel\n\n");
 	PrintStatus(&Services, "KSucces", "Entrando a etapa de arranque listo\n");
 	PrintStatus(&Services, "Mensaje", "Presione enter para continuar\n");
 	PrintStatus(&Services, "Mensaje", "Esta es la pantalla de bloqueo de ModuKernel\n");

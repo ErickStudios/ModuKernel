@@ -49,6 +49,8 @@ typedef KernelStatus (*KernelServicesReset)(int func);
 typedef KernelStatus (*KernelServicesRunBinary)(void* buffer, int size, struct _KernelServices* Services);
 /* el tipo para obtener la fecha y hora */
 typedef void (*KernelServicesGetTimeDate)(KernelDateTime* Time);
+/* el tipo para obtener la cantidad de ticks que transcurrieron desde que inicio la maquina*/
+typedef unsigned long long (*KernelServicesGetTicks)();
 /* el tipo de servicios otros */
 typedef struct _KernelMiscServices {
     /* funcion para ejecutar un comando desde la shell, requiere como 
@@ -73,6 +75,9 @@ typedef struct _KernelMiscServices {
     void*** Paramaters;
     /* variable que apunta a la longitud de los parametros */
     int* ParamsCount;
+    /* funcion para obtener el numero de ciclos de relog que transcurrieron desde
+    que inicio la maquina ya sea qemu o maquina real */
+    KernelServicesGetTicks GetTicks;
 } KernelMiscServices;
 /* esta estructura contiene la tabla de servicios del kernel 
 para que sea mas comprensible , organizado y facil de usar */
