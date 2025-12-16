@@ -42,6 +42,30 @@ int StrnCmp(char* s1, char* s2, int len)
     }
     return Diferences; // 0 si iguales, >0 si hay diferencias
 }
+void UIntToString(unsigned int value, char* buffer) {
+    char temp[16]; // espacio temporal para dígitos
+    int i = 0;
+
+    // caso especial: valor = 0
+    if (value == 0) {
+        buffer[0] = '0';
+        buffer[1] = '\0';
+        return;
+    }
+
+    // extraer dígitos en orden inverso
+    while (value > 0) {
+        temp[i++] = '0' + (value % 10);
+        value /= 10;
+    }
+
+    // invertir el orden en buffer final
+    int j = 0;
+    while (i > 0) {
+        buffer[j++] = temp[--i];
+    }
+    buffer[j] = '\0';
+}
 // a string
 void IntToString(int value, char *buffer) {
     char temp[12];
@@ -142,6 +166,31 @@ char* StrChr(const char* str, int ch) {
         str++;
     }
     return 0; // no encontrado
+}
+void IntToHexString(unsigned int value, char* buffer) {
+    const char* hexDigits = "0123456789ABCDEF";
+    char temp[16]; // espacio temporal para dígitos
+    int i = 0;
+
+    // caso especial: valor = 0
+    if (value == 0) {
+        buffer[0] = '0';
+        buffer[1] = '\0';
+        return;
+    }
+
+    // extraer dígitos en orden inverso
+    while (value > 0) {
+        temp[i++] = hexDigits[value % 16];
+        value /= 16;
+    }
+
+    // invertir el orden en buffer final
+    int j = 0;
+    while (i > 0) {
+        buffer[j++] = temp[--i];
+    }
+    buffer[j] = '\0';
 }
 
 #endif

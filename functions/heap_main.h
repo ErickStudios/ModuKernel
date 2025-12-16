@@ -4,3 +4,5 @@ char _heap_start;
 char _heap_end;
 /* puntero al heap */
 static char* heap_ptr = &_heap_start;
+/* para ver cuanto queda */
+unsigned int InternalGetFreeHeapSpace();

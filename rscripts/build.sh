@@ -57,6 +57,21 @@ done
 
 # setear a 0
 afaf=0
+# para el sistema
+for file in modush/*.c; do
+    # extraer el nombre
+    nameq=$(basename "$file")
+    name="${nameq%.*}"
+    # compilar
+    compile_raw $file disk/SY$afaf.BIN
+    # añadir al mapa
+    echo "/sys/$name;SY$afaf;BIN;" >> disk/FSLST.IFS
+    # siguiente
+    let afaf=afaf+1
+done
+
+# setear a 0
+afaf=0
 # para el usuario
 for file in usr/*; do
     # extraer el nombre
@@ -68,6 +83,8 @@ for file in usr/*; do
     # siguiente
     let afaf=afaf+1
 done
+
+echo "/fs.struct;FSLST;IFS;" >> disk/FSLST.IFS
 
 # hacer la carpeta de monteo
 sudo mkdir -p /mnt/disk_qemu

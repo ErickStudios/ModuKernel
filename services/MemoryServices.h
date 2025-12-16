@@ -10,6 +10,8 @@ typedef void *(*KernelMemoryMove)(void *dest, const void *src, int n);
 typedef void *(*KernelMemoryCoppy)(void *dest, const void *src, unsigned int n);
 /* el tipo para comparar memoria */
 typedef int (*KernelMemoryComparate)(const void *s1, const void *s2, unsigned int n);
+/* el tipo para ver cuanto queda de heap */
+typedef unsigned int (*KernelMemoryGetFreeHeapSize)();
 /* la estructura */
 typedef struct _MemoryServices {
     /* funcion para asignar memoria dinamica usa un unico parametro
@@ -37,5 +39,8 @@ typedef struct _MemoryServices {
     que este no necesita direccion solamente necesitas poner el nombre
     de la variable a la que le hiciste AllocatePool anteriormente */
     KernelMemoryFreePool FreePool;
+    /* funcion para obtener cuanto espacio del heap queda en el sistema
+    operativo */
+    KernelMemoryGetFreeHeapSize GetFreeHeap;
 } MemoryServices;
 #endif

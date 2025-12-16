@@ -31,39 +31,124 @@ int CwdLevelDir = 1;
 
 static BlockHeader* heap_start = (BlockHeader*)&_heap_start;
 static BlockHeader* free_list = NULL;
-uint8_t ReadRTC(uint8_t reg) { outb(0x70, reg); return inb(0x71); }
-uint8_t BCDtoBin(uint8_t bcd) {return ((bcd >> 4) * 10) + (bcd & 0x0F);}
+uint8_t ReadRTC(uint8_t reg) 
+{ 
+	// mandar 0x70 en el rgistro
+	outb(0x70, reg); 
+	// retornar lo leido
+	return inb(0x71);
+}
+uint8_t BCDtoBin(uint8_t bcd) {
+	// retornarlo
+	return ((bcd >> 4) * 10) + (bcd & 0x0F);
+}
 unsigned long long InternalGetNumberOfTicksFromMachineStart()
 {
+	// parte alta y baja
     unsigned long lo, hi;
+	// leer el rdtsc
     __asm__ __volatile__("rdtsc" : "=a"(lo), "=d"(hi));
+	// juntarlo y retornarlo
     return (( unsigned long long)hi << 32) | lo;
+}
+void InternalModuPanic(KernelStatus Status)
+{
+	// esto puede ocurrir muy temprano asi que si lo
+	// hace muy temprano entonces no hay display entonces
+	// solo queda congelarlo
+	if (!(GlobalServices && GlobalServices->Display)) while (1);
+
+	// declarar variables para usar durante el ModuPanic
+
+	// el error
+	char HexError[9];
+	// alineado
+	char AlignedErr[9] = "00000000";
+
+	// parsearlo
+    IntToHexString(Status, HexError);
+	// para evitar errores
+	char* PtrHexError = HexError;
+	// la longitud
+	int LengthHex = StrLen(HexError);
+	// el parser
+    int StartPparse = LengthHex - 1;
+
+	// parsearlo
+	for (int i = 7; i >= 0 && StartPparse >= 0; i--) AlignedErr[i] = HexError[StartPparse--];
+
+	GlobalServices->Display->printg("*** stop *** - (Your system has been into in a ModuPanic) => ===0x");
+	GlobalServices->Display->printg(AlignedErr);
+	GlobalServices->Display->printg("===\n\nPlease report this error to 'https://github.com/ErickStudios/ModuKernel/issues' if the Error is not specifiqued or if is 0x00000000 (because that Stop code is KernelStatusSuccess and this is not a stop code reason)");
+	GlobalServices->Display->printg("\n\n\n\n");
+	GlobalServices->Display->printg("you can ignore this kernel panic pressing the key Enter but if you continue posibility the system cant continue, you can press 'r' key to restart your computer\n");
+
+	while (1)
+	{
+		char key = GlobalServices->InputOutpud->WaitKey();
+
+		if (key == '\n') return;
+		else if (key == 'r' || key == 'R') GlobalServices->Misc->Reset(0);
+	}
 }
 void PrintStatus(KernelServices* Services, char* status, char* text)
 {
+	// empezar
 	Services->Display->printg("[ ");
+	// atributo
 	Services->Display->setAttrs(0, 0x3);
+	// estado
 	Services->Display->printg(status);
+	// desatributo
 	Services->Display->setAttrs(0, 0x7);
+	// terminar
 	Services->Display->printg(" ]    ");
+	// imprimir texto
 	Services->Display->printg(text);
 }
 void InternalGetDateTime(KernelDateTime* Time) {
+	// segundo
     Time->second = BCDtoBin(ReadRTC(0x00));
+	// minuto
     Time->minute = BCDtoBin(ReadRTC(0x02));
+	// hora
     Time->hour   = BCDtoBin(ReadRTC(0x04));
+	// dia
     Time->day    = BCDtoBin(ReadRTC(0x07));
+	// mes
     Time->month  = BCDtoBin(ReadRTC(0x08));
+	// año
     Time->year   = 2000 + BCDtoBin(ReadRTC(0x09));
 }
-void InitHeap() 
-{
-    free_list = heap_start;
-    free_list->size = _heap_end - _heap_start - sizeof(BlockHeader);
-    free_list->free = 1;
-    free_list->next = NULL;
+void InitHeap() {
+    // Dirección base del heap
+    char* heap_start = &_heap_start;
+    char* heap_end   = &_heap_end;
+
+    // Alinea si lo deseas (opcional, por ejemplo a 8 o 16 bytes)
+    // heap_start = (char*)(((unsigned int)heap_start + 7) & ~7);
+
+    // Crear bloque único
+    BlockHeader* first = (BlockHeader*)heap_start;
+
+    unsigned int total_bytes = (unsigned int)(heap_end - heap_start);
+    unsigned int header_size = sizeof(BlockHeader);
+
+    // Verificación mínima
+    if (total_bytes <= header_size) {
+        // No hay heap suficiente
+        free_list = NULL;
+        return;
+    }
+
+    first->size = total_bytes - header_size; // parte útil
+    first->free = 1;
+    first->next = NULL;
+
+    free_list = first;
 }
-KernelStatus InternalDiskReadSector(unsigned int lba, unsigned char* buffer) {
+KernelStatus InternalDiskReadSector(unsigned int lba, unsigned char* buffer) 
+{
 	// lo lee 1
     outb(0x1F6, 0xE0 | ((lba >> 24) & 0x0F)); 
 	// lo lee 2
@@ -71,6 +156,7 @@ KernelStatus InternalDiskReadSector(unsigned int lba, unsigned char* buffer) {
 	// lo lee 3
 	outb(0x1F5, (uint8_t)(lba >> 16)); outb(0x1F7, 0x20);     
 
+	// tiempo de acabado
 	int timeout = 100000;
 
     // esperar a que DRQ esté listo
@@ -79,20 +165,28 @@ KernelStatus InternalDiskReadSector(unsigned int lba, unsigned char* buffer) {
     // leer 256 palabras (512 bytes)
     for (int i = 0; i < 256; i++) ((uint16_t*)buffer)[i] = inw(0x1F0);
 
+	// retornar status
 	return KernelStatusSuccess;
 }
-FatFile InternalDiskFindFile(char* name, char* ext) {
+FatFile InternalDiskFindFile(char* name, char* ext) 
+{
+	// sector
     uint8_t sector0[512];
+	// leerlo
     InternalDiskReadSector(0, sector0);
 
+	// estructura
     struct _FAT12_BootSector* bs_local = (struct _FAT12_BootSector*) sector0;
 
     // Copia el boot sector a heap (memoria persistente)
     struct _FAT12_BootSector* bs = (struct _FAT12_BootSector*) AllocatePool(sizeof(*bs));
     if (!bs) {
+		// vacio
         FatFile empty = {0};
-        return empty; // o manejar error
+		// retornar vacio
+        return empty;
     }
+	// copiar
     InternalMemoryCopy(bs, bs_local, sizeof(*bs));
 
     // calcular root_start, root_sectors...
@@ -107,29 +201,51 @@ FatFile InternalDiskFindFile(char* name, char* ext) {
         return empty;
     }
 
-    for (int s = 0; s < root_sectors; s++) {
-        InternalDiskReadSector(root_start + s, root_buffer + s * bs->bytes_per_sector);
-    }
+	// leer sector
+    for (int s = 0; s < root_sectors; s++) InternalDiskReadSector(root_start + s, root_buffer + s * bs->bytes_per_sector);
 
+	// entrada
     struct _FAT12_DirEntry* dir = (struct _FAT12_DirEntry*) root_buffer;
+	// entradas totales
     int total_entries = bs->root_entries;
 
+	// ver
     for (int i = 0; i < total_entries; i++) {
+		// si no existe o elminado
         if (dir[i].name[0] == 0x00 || dir[i].name[0] == 0xE5) continue;
 
+		// si coincide el nombre
         if (InternalMemoryComp(dir[i].name, name, 8) == 0 &&
             InternalMemoryComp(dir[i].name + 8, ext, 3) == 0) {
+			// estructura
             FatFile File;
-            File.bs = bs;           // puntero a la copia en heap (válido después del return)
-            File.sector = dir[i];   // copia por valor del dir entry
-            // opcional: liberar root_buffer si ya no se necesita
+			// archivo
+            File.bs = bs; 
+			// sector
+            File.sector = dir[i];
+            // retornarlo
             return File;
         }
     }
 
-    // no encontrado: liberar root_buffer y bs si necesario
+    // no encontrado
     FatFile empty = {0};
+	// retornar
     return empty;
+}
+unsigned int InternalGetFreeHeapSpace() 
+{
+    unsigned int total = 0;
+    BlockHeader* current = free_list;
+
+    while (current) {
+        if (current->free) {
+            total += current->size;
+        }
+        current = current->next;
+    }
+
+    return total;
 }
 char* InternalReadLine()
 {
@@ -137,8 +253,10 @@ char* InternalReadLine()
 	char bufcmd[256]; int char_set = 0;
 	for (;;)
 	{
+		// tecla
 		char key = GlobalServices->InputOutpud->WaitKey(); 
 
+		// si es backspace
 		if (key == '\b') {
 			// si no es 0
 			if (GlobalServices->Display->CurrentCharacter > 0) {
@@ -157,6 +275,7 @@ char* InternalReadLine()
 			}
 		}
 		else {
+			// escapes de funciones
 			if (key == KernelSimpleIoFuncKey(1)) key = '_';
 			// el caracter
 			char buff[2] = { key , 0};
@@ -170,38 +289,42 @@ char* InternalReadLine()
 		// si es enter
 		if (key == '\n')
 		{	
-			// retornarlo
+			// crearlo
 			char* retval = AllocatePool(sizeof(char) * 256);
-
+			// copiarlo
 			for (short index = 0; index < 256; index++) retval[index] = bufcmd[index];
-
+			// retornarlo
 			return retval;
 		}
 	}
 }
 KernelStatus InternalDiskGetFile(FatFile file, void** content, int* size)
 {
-    if (file.sector.name[0] == 0x00)
-        return KernelStatusNotFound;
+	// si el archivo esta eliminado no se esta
+    if (file.sector.name[0] == 0x00) return KernelStatusNotFound;
 
+	// sector
     struct _FAT12_BootSector* bs = file.bs;
+	// directorio
     struct _FAT12_DirEntry dir   = file.sector;
 
-    // --- Leer FAT completa ---
+	// leer fat
     unsigned int fat_bytes = bs->fat_size_sectors * bs->bytes_per_sector;
+	// fat
     uint8_t* fat = (uint8_t*) AllocatePool(fat_bytes);
+	// si no hay presupuesto
     if (!fat) return KernelStatusNoBudget;
 
     for (unsigned int s = 0; s < bs->fat_size_sectors; s++)
     {
         KernelStatus st = InternalDiskReadSector(bs->reserved_sectors + s,
-                                                 fat + s * bs->bytes_per_sector);
+                         fat + s * bs->bytes_per_sector);
 
-        if (_StatusError(st))
-            return st;
+		// si hubo un error retornar el status
+        if (_StatusError(st)) return st;
     }
 
-    // --- Calcular data region ---
+	// data region
     unsigned int root_start   = bs->reserved_sectors + bs->num_fats * bs->fat_size_sectors;
     unsigned int root_sectors = (bs->root_entries * 32) / bs->bytes_per_sector;
     unsigned int data_start   = root_start + root_sectors;
@@ -219,18 +342,23 @@ KernelStatus InternalDiskGetFile(FatFile file, void** content, int* size)
     // --- Leer clusters ---
     while (cluster < 0xFF8 && remaining > 0)
     {
+		// lba
         unsigned int lba = data_start + (cluster - 2) * bs->sectors_per_cluster;
 
         for (unsigned int s = 0; s < bs->sectors_per_cluster && remaining > 0; s++)
         {
             KernelStatus st = InternalDiskReadSector(lba + s, sector);
+
+			// si hay error retornarlo
             if (_StatusError(st)) return st;
 
-            unsigned int copy = (remaining > bs->bytes_per_sector ?
-                                 bs->bytes_per_sector : remaining);
+			// copia
+            unsigned int copy = (remaining > bs->bytes_per_sector ? bs->bytes_per_sector : remaining);
 
+			// copiar memoria
             InternalMemoryCopy(out + offset, sector, copy);
 
+			// obtenerlo
             offset    += copy;
             remaining -= copy;
         }
@@ -259,33 +387,50 @@ void InternalSetActualDisplayService(DisplayServices* Serv)
 }
 KernelStatus InternalKernelReset(int func) 
 {
+	// deshabilitar interrupciones
+    __asm__ __volatile__("cli");
 
-    __asm__ __volatile__("cli");   // Deshabilitar interrupciones
-
-    if (func == 1) {
+	// funcion de apagar
+    if (func == 1) 
+	{
+		// opcion 1
         outw(0x604, 0x2000);
+		// opcion 2
         outw(0xB004, 0x2000);
 
+		// si no tripe fault
         goto triple_fault;
     }
 
+	// esperar no se que cosa
     while (inb(0x64) & 0x02);
 
+	// reiniciar
 	outb(0x64, 0xFE);
 
-triple_fault:
-    return KernelStatusDisaster;
+	// tripe error
+	triple_fault:
+		// retornar que fue un desastre
+		return KernelStatusDisaster;
 }
 unsigned char InternalKeyboardReadChar()
 {
+	// si es extendido
 	int extended = 0;
+	// esperar
 	while(1) {
+		// estado
 		uint8_t status = inb(0x64);
 
+		// si es verdadero
 		if(status & 0x01) {
+			// codigo de escaneo
 			uint8_t scancode = inb(0x60);
 
+			// caracter
 			char character = 0;
+
+			// codigos
 
 			if(scancode == 0x01) character = KernelSimpleIoSpecKey(9);
 			else if(scancode == 0x0E) character = '\b';
@@ -441,6 +586,7 @@ void InitializeKernel(KernelServices* Services)
     Mem->CoppyMemory  = &InternalMemoryCopy;
     Mem->CompareMemory= &InternalMemoryComp;
     Mem->FreePool     = &FreePool;
+	Mem->GetFreeHeap  = &InternalGetFreeHeapSpace;
 
     // disco
     Dsk->RunFile    = &ProcessCrtByFile;
@@ -504,7 +650,7 @@ FatFile InternalExtendedFindFile(char* path)
     return fileNull; // no encontrado
 }
 KernelStatus InternalRunBinary(void* buffer, int size, KernelServices* Services) {
-    #define USER_LOAD_ADDR ((uint8_t*)0x00400000)
+    #define USER_LOAD_ADDR ((uint8_t*)0x00F00000)
 
     typedef struct {
         char magic[8];       // "ModuBin\0"
@@ -573,7 +719,7 @@ void InternalSysCommandExecute(KernelServices* Services, char* command, int lena
 		}
 	}
 	else if (StrCmp(command ,"ls") == 0)
-	{
+	{ 
 		FatFile StructureFs = Services->File->FindFile("FSLST   ", "IFS");
 		void* StructFs; int FsSize;
 		KernelStatus StructureFound = Services->File->GetFile(StructureFs, &StructFs, &FsSize);
@@ -724,6 +870,8 @@ void InternalSysCommandExecute(KernelServices* Services, char* command, int lena
             KernelStatus result = Services->Misc->RunBinary(buffer, size, Services);
         }
 
+		Services->Memory->FreePool(buffer);
+
 		Magic = 0x043b;
 		Services->Misc->Paramaters[0] = &Magic;
 	}
@@ -741,6 +889,17 @@ void InternalSysCommandExecute(KernelServices* Services, char* command, int lena
 	}
 	else if (StrCmp(command, "reset") == 0) Services->Misc->Reset(0);
 	else if (StrCmp(command, "shutdown") == 0) Services->Misc->Reset(1);
+	else if (StrCmp(command, "heap") == 0)
+	{
+		unsigned int HeapRest = Services->Memory->GetFreeHeap();
+		char freesp[16];
+
+		UIntToString(HeapRest, freesp);
+
+		Services->Display->printg("Espacio libre: ");
+		Services->Display->printg(freesp);
+		Services->Display->printg("\n");
+	}
 	else if (StrnCmp(command, "modush ", 7) == 0)
 	{
 		char* shell_file =command + 7;
@@ -759,12 +918,14 @@ void InternalSysCommandExecute(KernelServices* Services, char* command, int lena
         KernelStatus status = Services->File->GetFile(file, &buffer, &size);
 
         if (!_StatusError(status)) {
-			char* text = (char*)buffer; char* parts[120];
+			char* text = (char*)buffer; text[file.sector.file_size] = 0; char* parts[120];
             int n = StrSplit(text, parts, '\n');
             for (int i = 0; i < n; i++) Services->Misc->Run(Services, parts[i], 0);
-            return;
+           	Services->Memory->FreePool(buffer);
+			return;
 		}
-		
+
+		Services->Memory->FreePool(buffer);
 		Services->Display->printg("no se pudo ejecutar");
 	}
 	else if (StrnCmp(command, "cat ", 4) == 0)
@@ -785,11 +946,15 @@ void InternalSysCommandExecute(KernelServices* Services, char* command, int lena
         KernelStatus status = Services->File->GetFile(file, &buffer, &size);
 
         if (!_StatusError(status)) {
-			char* text = (char*)buffer; char* parts[120];
+			char* text = (char*)buffer;
+			text[file.sector.file_size] = 0;
 			Services->Display->printg(text);
 			Services->Display->printg("\n");
+			Services->Memory->FreePool(buffer);
 			return;
 		}
+
+		Services->Memory->FreePool(buffer);
 	}
 	else if (StrCmp(command, "time") == 0)
 	{
@@ -811,6 +976,7 @@ void InternalSysCommandExecute(KernelServices* Services, char* command, int lena
 		Services->Display->printg(Second);
 		Services->Display->printg("\n");
 	}
+	else if (StrCmp(command, "modupanic") == 0) InternalModuPanic(KernelStatusSuccess);
 	else if (StrCmp(command, "") == 0);
 	else {
 		char* Params[128];
@@ -830,8 +996,11 @@ void InternalSysCommandExecute(KernelServices* Services, char* command, int lena
         status = Services->File->GetFile(file, &buffer, &size);
         if (!_StatusError(status)) {
             KernelStatus result = Services->Misc->RunBinary(buffer, size, Services);
+			Services->Memory->FreePool(buffer);
 			return;
         }
+
+		Services->Memory->FreePool(buffer);
 
         file = Services->File->FindFile(name, "NSH");
         status = Services->File->GetFile(file, &buffer, &size);
@@ -839,9 +1008,12 @@ void InternalSysCommandExecute(KernelServices* Services, char* command, int lena
             char* text = (char*)buffer; char* parts[120];
             int n = StrSplit(text, parts, '\n');
             for (int i = 0; i < n; i++) Services->Misc->Run(Services, parts[i], 0);
-            return;
+            Services->Memory->FreePool(buffer);
+			return;
         }
 
+		Services->Memory->FreePool(buffer);
+	
 		char* Directory = CurrentWorkDirectory;
 		size_t dirLen = StrLen(Directory);
 		size_t fileLen = StrLen(Params[0]);
@@ -849,7 +1021,7 @@ void InternalSysCommandExecute(KernelServices* Services, char* command, int lena
 		char* NameExtended = AllocatePool(sizeof(char) * (dirLen + fileLen + 2));
 		InternalMemoryCopy(NameExtended, Directory, dirLen);
 		InternalMemoryCopy(NameExtended + dirLen, Params[0], fileLen);
-		NameExtended[dirLen + fileLen + 1] = '\0';
+		NameExtended[dirLen + fileLen] = '\0';
 
         // 3. Intentar alias extendido
         file = Services->File->OpenFile(NameExtended);
@@ -867,8 +1039,14 @@ void InternalSysCommandExecute(KernelServices* Services, char* command, int lena
 			}
 			
             KernelStatus result = Services->Misc->RunBinary(buffer, size, Services);
-            return;
-        }
+            
+			Services->Memory->FreePool(NameExtended);
+			Services->Memory->FreePool(buffer);
+			return;
+        }		
+		Services->Memory->FreePool(buffer);
+
+		Services->Memory->FreePool(NameExtended);
 
         Services->Display->printg("no se pudo leer archivo\n");
 	}
@@ -964,7 +1142,10 @@ void* AllocatePool(unsigned int size) {
         current = current->next;
     }
 
-    return 0; // out of memory
+	GlobalServices->Display->printg("\n");
+
+	InternalModuPanic(KernelStatusNoBudget);
+	return 0; // out of memory
 }
 void FreePool(void* ptr) {
     if (!ptr) return;
@@ -972,16 +1153,21 @@ void FreePool(void* ptr) {
     BlockHeader* block = (BlockHeader*)((char*)ptr - sizeof(BlockHeader));
     block->free = 1;
 
-    // intento de coalescer bloques contiguos
     BlockHeader* current = free_list;
 
-    while (current) {
-        if (current->free && current->next && current->next->free) {
+    while (current && current->next) {
+        BlockHeader* next = current->next;
+
+        // verificar que estén contiguos en memoria
+        if (current->free && next->free &&
+            (char*)current + sizeof(BlockHeader) + current->size == (char*)next) {
+
             // unir bloques
-            current->size += sizeof(BlockHeader) + current->next->size;
-            current->next = current->next->next;
+            current->size += sizeof(BlockHeader) + next->size;
+            current->next = next->next;
+        } else {
+            current = current->next;
         }
-        current = current->next;
     }
 }
 void InternalClearScreen()

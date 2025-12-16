@@ -9,7 +9,7 @@ ENTRY(ErickMain)
 
 SECTIONS {
   /* Dirección fija donde se ejecutará el programa */
-  . = 0x00400000;
+  . = 0x00F00000;
 
   /* Encabezado (16 bytes) al inicio de la imagen */
   .header : {
