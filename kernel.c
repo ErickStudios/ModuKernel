@@ -77,11 +77,42 @@ void InternalModuPanic(KernelStatus Status)
 	// parsearlo
 	for (int i = 7; i >= 0 && StartPparse >= 0; i--) AlignedErr[i] = HexError[StartPparse--];
 
-	GlobalServices->Display->printg("*** stop *** - (Your system has been into in a ModuPanic) => ===0x");
+	GlobalServices->Display->setAttrs(0, 9);
+	GlobalServices->Display->printg("*** stop *** \n\n(Tu sistema ha entrado en un ModuPanic) \n\n ===0x");
 	GlobalServices->Display->printg(AlignedErr);
-	GlobalServices->Display->printg("===\n\nPlease report this error to 'https://github.com/ErickStudios/ModuKernel/issues' if the Error is not specifiqued or if is 0x00000000 (because that Stop code is KernelStatusSuccess and this is not a stop code reason)");
-	GlobalServices->Display->printg("\n\n\n\n");
-	GlobalServices->Display->printg("you can ignore this kernel panic pressing the key Enter but if you continue posibility the system cant continue, you can press 'r' key to restart your computer\n");
+	GlobalServices->Display->printg("===\n\n");
+
+	GlobalServices->Display->printg("*Respuesta personal del sistema*: ");
+	switch (Status)
+	{
+	case KernelStatusSuccess:
+		GlobalServices->Display->printg("'ahora que hiciste Sys?'");
+		break;
+	case KernelStatusNotFound:
+		GlobalServices->Display->printg("'no se encontro algo que era importante'");
+		break;
+	case KernelStatusDisaster:
+		GlobalServices->Display->printg("'algo hiciste mal y se encabrono el sistema'");
+		break;
+	case KernelStatusInfiniteLoopTimeouted:
+		GlobalServices->Display->printg("'se quedo congelado, te salvaste por poco pero era algo importante y por eso el sistema se disparo al pie'");
+		break;
+	case KernelStatusNoBudget:
+		GlobalServices->Display->printg("'no habia mas memoria'");
+		break;
+	case KernelStatusMemoryRot:
+		GlobalServices->Display->printg("'la memoria se rompio'");
+		break;
+	case KernelStatusDiskServicesDiskErr:
+		GlobalServices->Display->printg("'el disco esta roto'");
+		break;
+	case KernelStatusInvalidParam:
+		GlobalServices->Display->printg("'en alguna cosa importante pusiste datos invalidos o basura'");
+		break;
+	default:
+		GlobalServices->Display->printg("'ni como ayudarte'");
+		break;
+	}
 
 	while (1)
 	{
@@ -560,6 +591,7 @@ void InitializeKernel(KernelServices* Services)
 	Services->Misc->Paramaters= &InternalParams;
 	Services->Misc->ParamsCount=&InternalParamsCount;
 	Services->Misc->GetTicks  = &InternalGetNumberOfTicksFromMachineStart;
+	Services->Misc->Throw 	  = &InternalModuPanic;
     Services->ServicesVersion = &InternalServicesVersion;
 
     // pantalla
@@ -1119,6 +1151,7 @@ KernelStatus ProcessCrtByFile(char* name, char* ext, KernelServices* Services)
 	}
 }
 void* AllocatePool(unsigned int size) {
+
     BlockHeader* current = free_list;
 
     while (current) {
