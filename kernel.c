@@ -31,6 +31,7 @@ int CwdLevelDir = 1;
 
 static BlockHeader* heap_start = (BlockHeader*)&_heap_start;
 static BlockHeader* free_list = NULL;
+
 uint8_t ReadRTC(uint8_t reg) 
 { 
 	// mandar 0x70 en el rgistro
@@ -50,6 +51,32 @@ unsigned long long InternalGetNumberOfTicksFromMachineStart()
     __asm__ __volatile__("rdtsc" : "=a"(lo), "=d"(hi));
 	// juntarlo y retornarlo
     return (( unsigned long long)hi << 32) | lo;
+}
+unsigned long long calibrate_tsc() {
+    // programa PIT canal 0 para ~50ms
+    outb(0x43, 0x34);          // canal 0, modo 2, acceso low/high
+    outb(0x40, 0x9B);          // divisor low byte
+    outb(0x40, 0x2E);          // divisor high byte (1193180/23863 ≈ 50ms)
+
+    unsigned long long start = InternalGetNumberOfTicksFromMachineStart();
+
+    // espera a que PIT llegue a cero
+    while (!(inb(0x61) & 0x20));
+
+    unsigned long long end = InternalGetNumberOfTicksFromMachineStart();
+
+    unsigned long long delta = end - start;
+    // 50ms = 0.05s
+    return (delta * 20); // escala a Hz
+}
+void udelay(unsigned long us, unsigned long cpu_freq_hz) {
+    unsigned long long start = InternalGetNumberOfTicksFromMachineStart();
+    unsigned long long ticks_per_us = cpu_freq_hz / 1000000ULL;
+    unsigned long long target = start + (ticks_per_us * us);
+
+    while (InternalGetNumberOfTicksFromMachineStart() < target) {
+		__asm__ __volatile__("nop");
+    }
 }
 void InternalModuPanic(KernelStatus Status)
 {
@@ -151,6 +178,14 @@ void InternalGetDateTime(KernelDateTime* Time) {
 	// año
     Time->year   = 2000 + BCDtoBin(ReadRTC(0x09));
 }
+void InternalWaitEticks(int Unities)
+{
+	// esperar
+	for (size_t i = 0; i < (5999999 * Unities); i++) { 
+		// para delay
+		int ala = ((10/2)*3); 
+	}
+}
 void InitHeap() {
     // Dirección base del heap
     char* heap_start = &_heap_start;
@@ -178,6 +213,12 @@ void InitHeap() {
 
     free_list = first;
 }
+
+void vga_putpixel(int x, int y, uint8_t color) {
+    uint8_t* vram = (uint8_t*)0xA0000;
+    vram[y*320 + x] = color;
+}
+
 KernelStatus InternalDiskReadSector(unsigned int lba, unsigned char* buffer) 
 {
 	// lo lee 1
@@ -1099,37 +1140,90 @@ KernelStatus InternalMiniKernelProgram(KernelServices* Services)
 }
 void k_main() 
 {
-	// etapa de arranque prematura
+	// etapa de arranque prematura aqui se inicializan los servicios basicos
+	// mas no los servicios del kernel donde se iniciaran prototipadamente
 
+	// inicializar heap para AllocatePool y FreePool
 	InitHeap();
+
+	// los servicios
     KernelServices Services;
 
+	// inicializar servicios
 	InitializeKernel(&Services);
 
-	// etapa de arranque
+	// etapa de arranque silencioso aqui se seleccionan diferentes configuraciones
+	// y otras cosas para poder inicializar los servicios de manera compleja, como
+	// la pantalla
 
+	// setear el servicio acutal de la pantalla
     Services.Display->Set(Services.Display);
+	// setear atributos
     Services.Display->setAttrs(0, 7);
+	// limpiar la pantalla
     Services.Display->clearScreen();
 
-	// etapa de arranque ya listo
+	// etapa de arranque en esta etapa ya es visible para el usuario, ya casi todo
+	// el kernel esta medio despierto, incluyendo los serviicos de pantalla, disco,
+	// memoria y otros, asi que ya le pueden mostarar al usuario
 
+	// ir a la posicion x0y0
 	Services.Display->setCursorPosition(0,0);
 
-	for (int i=0; i < 12; i++) Services.Display->printg("\n");
-
-	Services.Display->printg("           M o d u K e r n e l #                      ");
-
-	Services.Display->setCursorPosition(0,0);
-
+	// imprimir la promocion
 	Services.Display->printg("ModuKernel - https://github.com/ErickStudios/ModuKernel\n\n");
-	PrintStatus(&Services, "KSucces", "Entrando a etapa de arranque listo\n");
-	PrintStatus(&Services, "Mensaje", "Presione enter para continuar\n");
-	PrintStatus(&Services, "Mensaje", "Esta es la pantalla de bloqueo de ModuKernel\n");
-	
-	char* action = Services.InputOutpud->ReadLine();
 
+	// limpiar la pantalla
 	Services.Display->clearScreen();
+
+	// esto no es otra etapa de arranque, sigue siendo la etapa de arranque normal
+	// aunque aqui se hace una animacion para que no se vea muy cutre, recuerden, pueden
+	// personalizarla si se basan en el kernel
+
+	// zona
+	int IndexZone = 0;
+	// logo
+	char LogoABC[] = "ModuKernel";
+	// logo para operaciones
+	char* LogoABCForOperations = LogoABC;
+	// longitud
+	int LogoLen = StrLen(LogoABCForOperations);
+
+	// mostrar logo
+	for (int ab = 0; ab < (LogoLen * 5); ab++)
+	{
+		// setear linea actual
+
+		Services.Display->CurrentLine = 12;
+		Services.Display->CurrentCharacter = 70;
+
+		// mostrar logo
+		for (int i = 0; i < LogoLen; i++)
+		{
+			// si esta cerca pero no en la zona ,color cyan
+			if (i == (IndexZone-1) || i == (IndexZone+1)) Services.Display->setAttrs(0, 3);
+			// si esta en la zona ,color verde
+			else if (i == IndexZone) Services.Display->setAttrs(0, 2);
+			// si no esta en el rango ,color gris
+			else Services.Display->setAttrs(0, 7);
+
+			// escritura
+			char Wrt[2] = { LogoABCForOperations[i], 0 }; Services.Display->printg(Wrt);
+		}		
+
+		// esperar
+		InternalWaitEticks(2);
+
+		// sumar zona
+		IndexZone++;
+		// si ya recorrio el logo volver al inicio
+		if (IndexZone > LogoLen) IndexZone = 0;
+	}	
+
+	// etapa de usuario esta no es una etapa de arranque si no la recta final pero
+	// aqui el usuario ya tiene control completo del sistema y ya el sistema esta totalmente
+	// despierto, asi que lanza la shell por que si no que mas lanzar, recuerden que pueden
+	// personalizar su mini programa
 
 	InternalMiniKernelProgram(&Services);
 }

@@ -7,8 +7,6 @@ void* AllocatePool(unsigned int size);
 void InitializeKernel(KernelServices* Services);
 /* el mini programa del kernel */
 KernelStatus InternalMiniKernelProgram(KernelServices* Services);
-/* el kernel principal */ 
-void k_main();
 /* función para leer una tecla */
 unsigned char InternalKeyboardReadChar();
 /* ejecuta un comando */

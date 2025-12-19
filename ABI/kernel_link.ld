@@ -13,7 +13,7 @@ SECTIONS
 {
     /* actual */
 	. = 0x100000;
-
+    .multiboot : { KEEP(*(.multiboot)) }
     /* codigo */
 	.text : {*(.text)}
     /* datos */
