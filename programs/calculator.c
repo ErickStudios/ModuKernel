@@ -13,11 +13,11 @@ Operacion PedirOperacion(KernelServices* Servicios)
 {
     Operacion Op;
     Servicios->Display->printg("1: ");
-    Op.nums[0] = Expresion(Servicios->InputOutpud->ReadLine());
+    Op.nums[0] = Expresion(Servicios->InputOutput->ReadLine());
     Servicios->Display->printg("\n");
 
     Servicios->Display->printg("2: ");
-    Op.nums[1] = Expresion(Servicios->InputOutpud->ReadLine());
+    Op.nums[1] = Expresion(Servicios->InputOutput->ReadLine());
     Servicios->Display->printg("\n");
 
     return Op;
@@ -42,7 +42,7 @@ KernelStatus ErickMain(KernelServices* Services)
 {
     for (;;) {
         Services->Display->printg("Calc: ");
-        Corto* Action = Services->InputOutpud->ReadLine();
+        Corto* Action = Services->InputOutput->ReadLine();
 
         Services->Display->printg("\n");
 

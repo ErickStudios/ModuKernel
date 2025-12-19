@@ -1,17 +1,17 @@
 // incluir archivos
-#include "services/KernelServices.h"
+#include "../services/KernelServices.h"
 #include "kernel.h"
-#include "fs/fat12.h"
+#include "../fs/fat12.h"
 
 // incluir funciones y prototipos
-#include "functions/misc_main.h"
-#include "functions/disk_main.h"
-#include "functions/screen_main.h"
-#include "functions/c_main.h"
-#include "functions/heap_main.h"
+#include "../functions/misc_main.h"
+#include "../functions/disk_main.h"
+#include "../functions/screen_main.h"
+#include "../functions/c_main.h"
+#include "../functions/heap_main.h"
 
 // incluir funciones de la libreria c de bajo nivel
-#include "libc/String.h"
+#include "../libc/String.h"
 
 // servicios globales
 KernelServices* GlobalServices;
@@ -113,7 +113,7 @@ void InternalModuPanic(KernelStatus Status)
 	switch (Status)
 	{
 	case KernelStatusSuccess:
-		GlobalServices->Display->printg("'ahora que hiciste Sys?'");
+		GlobalServices->Display->printg("'mapache que porqueria'");
 		break;
 	case KernelStatusNotFound:
 		GlobalServices->Display->printg("'no se encontro algo que era importante'");
@@ -143,7 +143,7 @@ void InternalModuPanic(KernelStatus Status)
 
 	while (1)
 	{
-		char key = GlobalServices->InputOutpud->WaitKey();
+		char key = GlobalServices->InputOutput->WaitKey();
 
 		if (key == '\n') return;
 		else if (key == 'r' || key == 'R') GlobalServices->Misc->Reset(0);
@@ -326,7 +326,7 @@ char* InternalReadLine()
 	for (;;)
 	{
 		// tecla
-		char key = GlobalServices->InputOutpud->WaitKey(); 
+		char key = GlobalServices->InputOutput->WaitKey(); 
 
 		// si es backspace
 		if (key == '\b') {
@@ -591,6 +591,95 @@ unsigned char InternalKeyboardReadChar()
 	}
 
 }
+unsigned char InternalKeyboardReadCharNonBlocking() {
+    uint8_t status = inb(0x64);
+
+    if (!(status & 0x01)) {
+        return 0; // no hay tecla disponible
+    }
+
+    uint8_t scancode = inb(0x60);
+    static int extended = 0;
+    char character = 0;
+
+    if (scancode == 0xE0) {
+        extended = 1;
+        return 0;
+    }
+
+    if (extended) {
+        extended = 0;
+        if (scancode == 0x48) return KernelSimpleIoSpecKey(1); // arriba
+        if (scancode == 0x50) return KernelSimpleIoSpecKey(2); // abajo
+        if (scancode == 0x4B) return KernelSimpleIoSpecKey(3); // izquierda
+        if (scancode == 0x4D) return KernelSimpleIoSpecKey(4); // derecha
+        return 0;
+    }
+
+	if(scancode == 0x01) character = KernelSimpleIoSpecKey(9);
+	else if(scancode == 0x0E) character = '\b';
+	else if(scancode == 0x02) character = LowerUpper ? '!' : '1';
+	else if(scancode == 0x03) character = LowerUpper ? '"' : '2';
+	else if(scancode == 0x04) character = LowerUpper ? '#' : '3';
+	else if(scancode == 0x05) character = LowerUpper ? '$' : '4';
+	else if(scancode == 0x06) character = LowerUpper ? '%' : '5';
+	else if(scancode == 0x07) character = LowerUpper ? '&' : '6';
+	else if(scancode == 0x08) character = LowerUpper ? '/' : '7';
+	else if(scancode == 0x09) character = LowerUpper ? '(' : '8';
+	else if(scancode == 0x0A) character = LowerUpper ? ')' : '9';
+	else if(scancode == 0x0B) character = LowerUpper ? '=' : '0';
+	else if(scancode == 0x0C) character = LowerUpper ? '?' : '\'';
+	else if(scancode == 0x0D) character = LowerUpper ? ' ' : '!';
+	else if(scancode == 0x1A) character = LowerUpper ? '{' : '[';
+	else if(scancode == 0x1B) character = LowerUpper ? '}' : ']';
+	else if(scancode == 0x27) character = LowerUpper ? ':' : ';';
+	else if(scancode == 0x0D) character = LowerUpper ? '+' : '=';
+	else if(scancode == 0x33) character = LowerUpper ? '?' : ',';
+	else if(scancode == 0x34) character = LowerUpper ? '>' : '.';
+	else if(scancode == 0x35) character = LowerUpper ? '<' : '/';
+	else if(scancode == 0x3A) LowerUpper = !LowerUpper;
+	else if(scancode == 0x1E) character = 'a';
+	else if(scancode == 0x30) character = 'b';
+	else if(scancode == 0x2E) character = 'c';
+	else if(scancode == 0x20) character = 'd';
+	else if(scancode == 0x12) character = 'e';
+	else if(scancode == 0x21) character = 'f';
+	else if(scancode == 0x22) character = 'g';
+	else if(scancode == 0x23) character = 'h';
+	else if(scancode == 0x17) character = 'i';
+	else if(scancode == 0x24) character = 'j';
+	else if(scancode == 0x25) character = 'k';
+	else if(scancode == 0x26) character = 'l';
+	else if(scancode == 0x32) character = 'm';
+	else if(scancode == 0x31) character = 'n';
+	else if(scancode == 0x18) character = 'o';
+	else if(scancode == 0x19) character = 'p';
+	else if(scancode == 0x10) character = 'q';
+	else if(scancode == 0x13) character = 'r';
+	else if(scancode == 0x1F) character = 's';
+	else if(scancode == 0x14) character = 't';
+	else if(scancode == 0x16) character = 'u';
+	else if(scancode == 0x2F) character = 'v';
+	else if(scancode == 0x11) character = 'w';
+	else if(scancode == 0x2D) character = 'x';
+	else if(scancode == 0x15) character = 'y';
+	else if(scancode == 0x2C) character = 'z';
+	else if(scancode == 0x39) character = ' ';
+	else if(scancode == 0x1C) character = '\n'; 
+
+	else if(scancode == 0x3B) character = KernelSimpleIoFuncKey(1);
+	else if(scancode == 0x3C) character = KernelSimpleIoFuncKey(2);
+	else if(scancode == 0x3D) character = KernelSimpleIoFuncKey(3);
+	else if(scancode == 0x3E) character = KernelSimpleIoFuncKey(4);
+	else if(scancode == 0x3F) character = KernelSimpleIoFuncKey(5);
+	else if(scancode == 0x40) character = KernelSimpleIoFuncKey(6);
+	else if(scancode == 0x41) character = KernelSimpleIoFuncKey(7);
+	else if(scancode == 0x42) character = KernelSimpleIoFuncKey(8);
+	else if(scancode == 0x43) character = KernelSimpleIoFuncKey(9);
+	else if(scancode == 0x44) character = KernelSimpleIoFuncKey(10);
+
+    return LowerUpper ? CharToUpCase(character) : character;
+}
 void InitializeKernel(KernelServices* Services)
 {
     // opcional: limpia la estructura principal (si vive en stack)
@@ -618,11 +707,11 @@ void InitializeKernel(KernelServices* Services)
     InternalMemorySet(Msc, 0, sizeof(KernelMiscServices));
 
     // conectar subestructuras
-    Services->Display = Dsp;
-    Services->Memory  = Mem;
-    Services->InputOutpud = IO;
-    Services->File    = Dsk;
-    Services->Misc    = Msc;
+    Services->Display 		= Dsp;
+    Services->Memory  		= Mem;
+    Services->InputOutput 	= IO;
+    Services->File    		= Dsk;
+    Services->Misc    		= Msc;
 
     // servicios principales
     Services->Misc->Run       = &InternalSysCommandExecute;
@@ -652,6 +741,7 @@ void InitializeKernel(KernelServices* Services)
     IO->Outpud  = &outb;
     IO->WaitKey = &InternalKeyboardReadChar;
     IO->ReadLine= &InternalReadLine;
+	IO->ReadKey = &InternalKeyboardReadCharNonBlocking;
 
     // memoria
     Mem->AllocatePool = &AllocatePool;
@@ -1131,7 +1221,7 @@ KernelStatus InternalMiniKernelProgram(KernelServices* Services)
 
 	for (;;) {
 		Services->Misc->Run(Services, "prp", 0);
-		char* Prompt = Services->InputOutpud->ReadLine();
+		char* Prompt = Services->InputOutput->ReadLine();
 
 		Services->Display->printg("\n");
 		Services->Misc->Run(Services, Prompt, 0);
@@ -1192,6 +1282,10 @@ void k_main()
 	// mostrar logo
 	for (int ab = 0; ab < (LogoLen * 5); ab++)
 	{
+		char Key = Services.InputOutput->ReadKey();
+
+		if (Key == 'c' || Key == 'C') break;
+
 		// setear linea actual
 
 		Services.Display->CurrentLine = 12;

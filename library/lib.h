@@ -46,6 +46,6 @@ void InitializeLibrary(Sys* System)
 
     // inicializar servicios
     gDS = System->Display;
-    gIOS = System->InputOutpud;
+    gIOS = System->InputOutput;
     gMS = System->Memory;
 }

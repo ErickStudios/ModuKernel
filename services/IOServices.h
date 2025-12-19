@@ -12,6 +12,8 @@ typedef void (*KernelSimpleIoOutpud)(unsigned short port, unsigned char val);
 typedef unsigned char (*KernelSimpleIoKeyWait)();
 /* el tipo de leer linea */
 typedef char* (*KernelSimpleIoReadLine)();
+/* el tipo de teclado sin esperar */
+typedef unsigned char (*KernelSimpleIoKeyRead)();
 /* el tipo de servicios de salida */
 typedef struct _IoServices {
     /* funcion para obtener un dato de un puerto, el primer y unico
@@ -36,5 +38,10 @@ typedef struct _IoServices {
     del kernel (FreePool) ya que se crea con (AllocatePool) y para evitar problemas
     necesita librerarla */
     KernelSimpleIoReadLine ReadLine;
+    /* funcion para leer una tecla, esta funcion hace lo mismo que WaitKey solo que
+    la unica diferencia es que no espera, puedes estar por ejemplo ejecutando algo y
+    mientras lo ejecutas puedes leer una tecla para interrumpir o hacer algo interesante
+    con multitarea basica */
+    KernelSimpleIoKeyRead ReadKey;
 } IoServices;
 #endif

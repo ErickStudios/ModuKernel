@@ -94,7 +94,7 @@ typedef struct _KernelServices {
     /* servicio para administrar memoria dinamica */
     MemoryServices* Memory;
     /* servicio para entrada y salida de dispositivos */
-    IoServices* InputOutpud;
+    IoServices* InputOutput;
     /* servicio para administracion de FAT12 y FAT12 extendido */
     DiskServices* File;
     /* servicios miscelianos que no encajan en ninguna otra categoria */

@@ -16,7 +16,7 @@ mkdir -p build disk
 
 # Kernel
 nasm -f elf32 assembly/kernel.asm -o build/kasm.o
-gcc -m32 -ffreestanding -fno-stack-protector -nostdlib -c kernel.c -o build/kc.o
+gcc -m32 -ffreestanding -fno-stack-protector -nostdlib -c kernel/kernel.c -o build/kc.o
 ld -m elf_i386 -T ABI/kernel_link.ld -o build/kernel build/kasm.o build/kc.o
 
 # FS map
@@ -69,9 +69,9 @@ sudo cp disk/* /mnt/disk_qemu/
 sudo umount /mnt/disk_qemu
 
 # GRUB ISO
-mkdir -p isodir/boot/grub
-cp build/kernel isodir/boot/kernel
-cat > isodir/boot/grub/grub.cfg <<'EOF'
+mkdir -p config/boot/grub
+cp build/kernel config/boot/kernel
+cat > config/boot/grub/grub.cfg <<'EOF'
 set timeout=12
 set default=0
 
@@ -89,7 +89,7 @@ menuentry "Bash" {
     bash
 }
 EOF
-grub-mkrescue -o build/os.iso isodir
+grub-mkrescue -o build/os.iso config
 
 # Run QEMU via GRUB so framebuffer is honored
 qemu-system-i386 \
