@@ -2,6 +2,7 @@
 #include "../services/KernelServices.h"
 
 #include "../libc/String.h"
+#include <stdint.h>
 
 // el tipo de sistema
 typedef KernelServices Sys;

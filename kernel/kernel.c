@@ -186,7 +186,8 @@ void InternalWaitEticks(int Unities)
 		int ala = ((10/2)*3); 
 	}
 }
-void InitHeap() {
+void InitHeap() 
+{
     // Dirección base del heap
     char* heap_start = &_heap_start;
     char* heap_end   = &_heap_end;
@@ -213,12 +214,11 @@ void InitHeap() {
 
     free_list = first;
 }
-
-void vga_putpixel(int x, int y, uint8_t color) {
+void vga_putpixel(int x, int y, uint8_t color) 
+{
     uint8_t* vram = (uint8_t*)0xA0000;
     vram[y*320 + x] = color;
 }
-
 KernelStatus InternalDiskReadSector(unsigned int lba, unsigned char* buffer) 
 {
 	// lo lee 1
@@ -304,6 +304,27 @@ FatFile InternalDiskFindFile(char* name, char* ext)
     FatFile empty = {0};
 	// retornar
     return empty;
+}
+void InternalMusicSetTone(unsigned int freq) {
+    if (freq == 0) return;
+
+    // calcular divisor
+    uint32_t divisor = 1193180 / freq;
+
+    // configurar PIT canal 2 (modo 3: square wave)
+    outb(0x43, 0xB6);              // comando: canal 2, modo 3, acceso bajo/alto
+    outb(0x42, (uint8_t)(divisor & 0xFF));       // parte baja
+    outb(0x42, (uint8_t)((divisor >> 8) & 0xFF)); // parte alta
+
+    // activar speaker (bits 0 y 1 del puerto 0x61)
+    uint8_t tmp = inb(0x61);
+    if ((tmp & 3) != 3) {
+        outb(0x61, tmp | 3);
+    }
+}
+void InternalMusicMuteTone() {
+    uint8_t tmp = inb(0x61) & 0xFC; // limpiar bits 0 y 1
+    outb(0x61, tmp);
 }
 unsigned int InternalGetFreeHeapSpace() 
 {
@@ -691,6 +712,8 @@ void InitializeKernel(KernelServices* Services)
     IoServices* IO     = AllocatePool(sizeof(IoServices));
     DiskServices* Dsk  = AllocatePool(sizeof(DiskServices));
     KernelMiscServices* Msc = AllocatePool(sizeof(KernelMiscServices));
+    TimeServices* Tim = AllocatePool(sizeof(TimeServices));
+    MusicServices* Music = AllocatePool(sizeof(MusicServices));
 
     // comprobar allocs
     if (!Dsp || !Mem || !IO || !Dsk || !Msc) {
@@ -712,6 +735,8 @@ void InitializeKernel(KernelServices* Services)
     Services->InputOutput 	= IO;
     Services->File    		= Dsk;
     Services->Misc    		= Msc;
+	Services->Time			= Tim;
+	Services->Music			= Music;
 
     // servicios principales
     Services->Misc->Run       = &InternalSysCommandExecute;
@@ -757,6 +782,13 @@ void InitializeKernel(KernelServices* Services)
     Dsk->GetFile    = &InternalDiskGetFile;
     Dsk->ReadSector = &InternalDiskReadSector;
 	Dsk->OpenFile 	= &InternalExtendedFindFile;
+
+	// tiempo
+	Tim->TaskDelay 	= &InternalWaitEticks;
+
+	// musica
+	Music->PlayTone	= &InternalMusicSetTone;
+	Music->Mute		= &InternalMusicMuteTone;
 
     // hacer global la estructura principal
     GlobalServices = Services;
@@ -1260,8 +1292,19 @@ void k_main()
 	// ir a la posicion x0y0
 	Services.Display->setCursorPosition(0,0);
 
+	Services.Music->PlayTone(440);
+	Services.Time->TaskDelay(20);
+	Services.Music->Mute();
+
 	// imprimir la promocion
-	Services.Display->printg("ModuKernel - https://github.com/ErickStudios/ModuKernel\n\n");
+	Services.Display->printg("ErickCraftStudios ModuKernel (Operating System)\n\n");
+	Services.Display->printg("powered By ModuKernel - https://github.com/ErickStudios/ModuKernel\n\n");
+	Services.Time->TaskDelay(20);
+	Services.Display->printg("puedes apoyarnos en github con el enlaze, estamos arrancando el Kernel, espere\n");
+	Services.Display->printg("[ KSuccess   ]  Kernel Cargado\n");
+	Services.Display->printg("[ KSuccess   ]  Kernel Configurado\n");
+	Services.Display->printg("cargando kernel\n");
+	Services.Time->TaskDelay(40);
 
 	// limpiar la pantalla
 	Services.Display->clearScreen();
@@ -1306,7 +1349,7 @@ void k_main()
 		}		
 
 		// esperar
-		InternalWaitEticks(2);
+		Services.Time->TaskDelay(2);
 
 		// sumar zona
 		IndexZone++;
@@ -1319,6 +1362,7 @@ void k_main()
 	// despierto, asi que lanza la shell por que si no que mas lanzar, recuerden que pueden
 	// personalizar su mini programa
 
+	Services.Display->printg("\n\n");
 	InternalMiniKernelProgram(&Services);
 }
 KernelStatus ProcessCrtByFile(char* name, char* ext, KernelServices* Services)
@@ -1430,42 +1474,37 @@ void InternalCursorPos(int x, int y) {
 }
 void InternalPrintgNonLine(char *message)
 {
-	// memoria de video
-	char *vidmem = (char *) 0xb8000;
-	// el int
-	unsigned int i=0;
-	// linea
-	int line = *line_selected;
-	// añadir linea
-	i=(line*80*2) + ((*row_selected)%(1*80*2));
-	// esperar a que no sea 0
-	while(*message!=0)
-	{
-		// nueva linea
-		if(*message=='\n' || (((*row_selected)%(2*80)) > (78*2))) 
-		{
-			// salto
-			(*line_selected)++; i=((*line_selected)*80*2); *message++;
+    char *vidmem = (char *)0xb8000;
+    int line = *line_selected;
+    int column = (*row_selected) / 2; // convertir a columna
 
-		if (*line_selected >= 25) {
-			// mover todo hacia arriba (24 líneas)
-			InternalMemMove(vidmem, vidmem + 80*2, 24*80*2);
-			// limpiar última línea
-			for (int j = 0; j < 80; j++) {
-				vidmem[(24*80 + j)*2] = ' ';
-				vidmem[(24*80 + j)*2 + 1] = *text_attr;
-			}
-			*line_selected = 24;
-			i = (*line_selected)*80*2;
-		}
+    while (*message != 0)
+    {
+        if (*message == '\n' || column >= 80)
+        {
+            line++;
+            column = 0;
+            message++;
 
-		} else {
-			// llenar con el caracter
-			vidmem[i]=*message; *message++; i++;
+            if (line >= 25) {
+                InternalMemMove(vidmem, vidmem + 80*2, 24*80*2);
+                for (int j = 0; j < 80; j++) {
+                    vidmem[(24*80 + j)*2] = ' ';
+                    vidmem[(24*80 + j)*2 + 1] = *text_attr;
+                }
+                line = 24;
+            }
+        }
+        else
+        {
+            int pos = (line * 80 + column) * 2;
+            vidmem[pos] = *message;
+            vidmem[pos+1] = *text_attr;
+            message++;
+            column++;
+        }
+    }
 
-			vidmem[i]=*text_attr; i++;
-		};
-	};
-	// llenar con el atributo de texto
-	*row_selected = i;
+    *line_selected = line;
+    *row_selected = column * 2; // mantener compatibilidad
 }

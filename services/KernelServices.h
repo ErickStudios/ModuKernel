@@ -5,6 +5,8 @@
 #include "MemoryServices.h"
 #include "IOServices.h"
 #include "DiskServices.h"
+#include "TimeServices.h"
+#include "MusicServices.h"
 /* codigos de error entre otros */
 typedef enum _KernelStatus {
     /* se puede */
@@ -99,5 +101,9 @@ typedef struct _KernelServices {
     DiskServices* File;
     /* servicios miscelianos que no encajan en ninguna otra categoria */
     KernelMiscServices* Misc;
+    /* servicios del tiempo */
+    TimeServices* Time;
+    /* servicios de musica */
+    MusicServices* Music;
 } KernelServices;
 #endif
