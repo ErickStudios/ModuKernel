@@ -24,7 +24,9 @@ typedef enum _KernelStatus {
     /* error del disco que no se puede leer o escribir */
     KernelStatusDiskServicesDiskErr,
     /* el parametro que se mando fue uno que no es valido */
-    KernelStatusInvalidParam
+    KernelStatusInvalidParam,
+    /* si algo es muy pequeño para ser usado o cargado */
+    KerneLStatusThingVerySmall
 } KernelStatus;
 /* el tipo de hora y fecha que es una estructura para hacerlo mas limpio */
 typedef struct _KernelDateTime {

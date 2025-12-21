@@ -12,6 +12,23 @@ typedef void *(*KernelMemoryCoppy)(void *dest, const void *src, unsigned int n);
 typedef int (*KernelMemoryComparate)(const void *s1, const void *s2, unsigned int n);
 /* el tipo para ver cuanto queda de heap */
 typedef unsigned int (*KernelMemoryGetFreeHeapSize)();
+/* enum para los tipos de memoria dinamica del Kernel */
+typedef enum _ModuAllocType
+{
+    /* para el tipo de memoria para los servicios
+    del kernel por ejemplo el display, io, memoria */
+    MemAllocTypeKernelServices,
+    /* tipo de rastreo de programas, que hacen los programas
+    al crear memoria */
+    MemAllocTypePrograms,
+    /* el tipo de memoria del sistema, que se puede hacer para
+    el tipo de memoria del sistema en la shell */
+    MemAllocTypeSystem,
+    /* el tipo de memoria liberada o desconozida */
+    MemAllocTypeFreeOrNotExist,
+    /* el tipo de memoria ultimo */
+    MemAllocTypeMaxMemoryType
+} ModuAllocType;
 /* la estructura */
 typedef struct _MemoryServices {
     /* funcion para asignar memoria dinamica usa un unico parametro
@@ -42,5 +59,8 @@ typedef struct _MemoryServices {
     /* funcion para obtener cuanto espacio del heap queda en el sistema
     operativo */
     KernelMemoryGetFreeHeapSize GetFreeHeap;
+    /* variable que contiene un puntero a el tipo de allocate del sistema
+    para poder cambiar entre tipos */
+    ModuAllocType* MallocType;
 } MemoryServices;
 #endif

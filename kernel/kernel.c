@@ -193,7 +193,7 @@ void InitHeap()
     char* heap_end   = &_heap_end;
 
     // Alinea si lo deseas (opcional, por ejemplo a 8 o 16 bytes)
-    // heap_start = (char*)(((unsigned int)heap_start + 7) & ~7);
+    //heap_start = (char*)(((unsigned int)heap_start + 7) & ~7);
 
     // Crear bloque único
     BlockHeader* first = (BlockHeader*)heap_start;
@@ -462,6 +462,8 @@ KernelStatus InternalDiskGetFile(FatFile file, void** content, int* size)
 
     *content = out;
     *size    = dir.file_size;
+
+	FreePool(fat);
     return KernelStatusSuccess;
 }
 void InternalSetAttriubtes(char bg, char fg)
@@ -775,6 +777,7 @@ void InitializeKernel(KernelServices* Services)
     Mem->CompareMemory= &InternalMemoryComp;
     Mem->FreePool     = &FreePool;
 	Mem->GetFreeHeap  = &InternalGetFreeHeapSpace;
+	Mem->MallocType	  = &MemoryCurrentSystem;
 
     // disco
     Dsk->RunFile    = &ProcessCrtByFile;
@@ -845,36 +848,102 @@ FatFile InternalExtendedFindFile(char* path)
     return fileNull; // no encontrado
 }
 KernelStatus InternalRunBinary(void* buffer, int size, KernelServices* Services) {
-    #define USER_LOAD_ADDR ((uint8_t*)0x00F00000)
+	// memoria antigua
+	ModuAllocType OldMallocType = MemoryCurrentSystem;
 
+	// memoria de usuario
+	MemoryCurrentSystem = MemAllocTypePrograms;
+
+	// donde carga el programa
+	#define USER_LOAD_ADDR ((uint8_t*)0x00F00000)
+
+	// estructura del tipo de programa
     typedef struct {
-        char magic[8];       // "ModuBin\0"
-        uint32_t entry;      // dirección de ErickMain
-        uint32_t bss_start;  // inicio .bss
-        uint32_t bss_end;    // fin .bss
+		// "ModuBin\0"
+        char magic[8];
+		// dirección de ErickMain
+        uint32_t entry;
+		// inicio .bss
+        uint32_t bss_start;
+		// fin .bss
+        uint32_t bss_end;
     } UserHeader;
 
-    if (size < sizeof(UserHeader)) {
-        Services->Display->printg("binario demasiado pequeño\n");
-        return KernelStatusDisaster;
-    }
+	// si es menor el tamaño
+    if (size < sizeof(UserHeader)) return KerneLStatusThingVerySmall;
 
+	// copiar al user load address el buffer
     InternalMemoryCopy(USER_LOAD_ADDR, buffer, size);
 
+	// el header
     UserHeader* hdr = (UserHeader*)USER_LOAD_ADDR;
-    if (Services->Memory->CompareMemory(hdr->magic, "ModuBin", 7) != 0) {
-        Services->Display->printg("header magic invalido\n");
-        return KernelStatusDisaster;
-    }
 
+	// parametro invalido
+    if (Services->Memory->CompareMemory(hdr->magic, "ModuBin", 7) != 0) return KernelStatusInvalidParam;
+
+	// si es mayor el end que el start
     if (hdr->bss_end > hdr->bss_start) {
+		// tamaño
         size_t bss_size = (size_t)(hdr->bss_end - hdr->bss_start);
+		// setear memoria
         InternalMemorySet((void*)hdr->bss_start, 0, bss_size);
     }
 
+	// el tipo de programa
     typedef KernelStatus (*ProgramEntry)(KernelServices*);
+
+	// entrada
     ProgramEntry entry = (ProgramEntry)(uintptr_t)hdr->entry;
-    return entry(Services);
+
+	// la ejecucion
+	KernelStatus Status = entry(Services);
+
+	// cambiar a ejecucion anterior
+	MemoryCurrentSystem = OldMallocType;
+
+	// retornar el status
+    return Status;
+}
+void InternalDumpHexMemory(void* buffer, size_t size) {
+    uint8_t* data = (uint8_t*)buffer;
+
+    for (size_t i = 0; i < size; i += 8) {
+        // 1. imprimir dirección
+        char addr[16];
+        IntToHexString((uint32_t)i, addr);
+        GlobalServices->Display->printg(addr);
+		GlobalServices->Display->CurrentCharacter = 10;
+
+        // 2. imprimir 8 bytes en hex
+        for (size_t j = 0; j < 8; j++) {
+            if (i + j < size) {
+                char hex[4];
+                IntToHexString(data[i + j], hex);
+                // asegurar que sean 2 dígitos
+                if (StrLen(hex) == 1) {
+                    GlobalServices->Display->printg("0");
+                }
+                GlobalServices->Display->printg(hex);
+                GlobalServices->Display->printg(" ");
+            } else {
+                // relleno si no hay más datos
+                GlobalServices->Display->printg("   ");
+            }
+        }
+
+        // 3. imprimir ASCII entre corchetes
+        GlobalServices->Display->printg(" [");
+        for (size_t j = 0; j < 8; j++) {
+            if (i + j < size) {
+                char c = data[i + j];
+                char em[2] = { (c >= 0x20 && c <= 0x7E) ? c : '.', 0 };
+                GlobalServices->Display->printg(em);
+            } else {
+                GlobalServices->Display->printg(" ");
+            }
+        }
+        GlobalServices->Display->printg("]\n");
+    }
 }
 void InternalSysCommandExecute(KernelServices* Services, char* command, int lena)
 {
@@ -886,32 +955,51 @@ void InternalSysCommandExecute(KernelServices* Services, char* command, int lena
 	{
 		char* directory = command + 3;
 
-		if (directory[0] == 0) return;
+		// Si es exactamente "cd /"
+		if (StrCmp(directory, "/") == 0) {
+			CurrentWorkDirectory[0] = '/';
+			CurrentWorkDirectory[1] = 0;
+			CwdCurrentCharacter = 1;
+			CwdLevelDir = 0;
+			return;
+		}
 
+		// Si es "cd .."
 		if (StrCmp(directory, "..") == 0) {
-			if (CwdCurrentCharacter > 1) { // evita borrar más allá de raíz
+			if (CwdCurrentCharacter > 1) {
 				CurrentWorkDirectory[(CwdCurrentCharacter--)-1] = 0;
 				while (CwdCurrentCharacter > 0 && CurrentWorkDirectory[CwdCurrentCharacter] != '/')
 					CurrentWorkDirectory[CwdCurrentCharacter--] = 0;
 
-				// si no estamos en raíz, dejar el slash final
-				if (CwdCurrentCharacter == 0) CurrentWorkDirectory[1] = 0; 
+				if (CwdCurrentCharacter == 0) CurrentWorkDirectory[1] = 0;
 				else CurrentWorkDirectory[CwdCurrentCharacter+1] = 0;
-				
+
 				CwdCurrentCharacter++;
 			}
 
 			CwdLevelDir--;
+			return;
 		}
-		else {
-			unsigned int DirectoryLen = StrLen(directory);
 
-			for (int i=0; i < DirectoryLen; i++) CurrentWorkDirectory[CwdCurrentCharacter++] = directory[i];
-		
-			CwdLevelDir++;
-			CurrentWorkDirectory[CwdCurrentCharacter++] = '/';
-			CurrentWorkDirectory[CwdCurrentCharacter] = 0;
+		// Si es "cd /algo"
+		if (directory[0] == '/') {
+			CurrentWorkDirectory[0] = '/';
+			CurrentWorkDirectory[1] = 0;
+			CwdCurrentCharacter = 1;
+			CwdLevelDir = 0;
+			directory++; // saltar el slash inicial
 		}
+
+		if (directory[0] == 0) return;
+
+		// Agregar el nuevo subdirectorio
+		unsigned int DirectoryLen = StrLen(directory);
+		for (int i = 0; i < DirectoryLen; i++)
+			CurrentWorkDirectory[CwdCurrentCharacter++] = directory[i];
+
+		CurrentWorkDirectory[CwdCurrentCharacter++] = '/';
+		CurrentWorkDirectory[CwdCurrentCharacter] = 0;
+		CwdLevelDir++;
 	}
 	else if (StrCmp(command ,"ls") == 0)
 	{ 
@@ -974,6 +1062,7 @@ void InternalSysCommandExecute(KernelServices* Services, char* command, int lena
 						for (int a=0; a < indexPutDirs; a++) {
 							if (StrCmp(putedDirs[a], temp) == 0) {
 								founded = 1;
+								FreePool(temp);
 								break;
 							}
 						}
@@ -1003,8 +1092,6 @@ void InternalSysCommandExecute(KernelServices* Services, char* command, int lena
 				}
 
 			}
-
-			GlobalServices->Memory->FreePool(StructFs);
 		}
 		else {
 			// leer boot sector
@@ -1047,6 +1134,7 @@ void InternalSysCommandExecute(KernelServices* Services, char* command, int lena
 		}
 		Services->Display->printg("\n");
 	
+		GlobalServices->Memory->FreePool(StructFs);
 	}
 	else if (StrnCmp(command, "drvload ", 8) == 0)
 	{
@@ -1149,6 +1237,7 @@ void InternalSysCommandExecute(KernelServices* Services, char* command, int lena
 			return;
 		}
 
+		Services->Memory->FreePool(file.bs);
 		Services->Memory->FreePool(buffer);
 	}
 	else if (StrCmp(command, "time") == 0)
@@ -1173,6 +1262,194 @@ void InternalSysCommandExecute(KernelServices* Services, char* command, int lena
 	}
 	else if (StrCmp(command, "modupanic") == 0) InternalModuPanic(KernelStatusSuccess);
 	else if (StrCmp(command, "") == 0);
+	else if (StrCmp(command, "memmap") == 0)
+	{
+		BlockHeader* Index = heap_start;
+
+		while (Index->next)
+		{
+			Services->Display->setAttrs(0, 7);
+
+			// tamaño
+			char Size[9];
+			// puntero
+			char Pointer[9];
+
+			// resolver tamaño
+			IntToHexString(Index->size, Size);
+			// resolver puntero
+			IntToHexString(Index->MemoryPtr, Pointer);
+
+			// buena suerte liberando eso bro 💀
+			if (Index->Type == MemAllocTypePrograms && ((*Services->Memory->MallocType) != MemAllocTypePrograms)) Services->Display->setAttrs(0, 4);
+
+			// memorias
+			switch (Index->Type)
+			{
+				// de servicios
+			case MemAllocTypeKernelServices:
+				Services->Display->printg("Services");
+				break;
+				// de programas
+			case MemAllocTypePrograms:
+				Services->Display->printg("UserMemory");
+				break;
+				// de sistema (Shell o otra app integrada mas no hecha por el usuario, estas ya vienen en codigo fuente del kernel)
+			case MemAllocTypeSystem:
+				Services->Display->printg("SystemMemory");
+				break;
+				// memoria liberada o inexistente
+			case MemAllocTypeFreeOrNotExist:
+				Services->Display->printg("FreeMemory");
+				break;
+				// por defecto
+			default:
+				Services->Display->printg("Unknown");
+				break;
+			}
+
+			Services->Display->CurrentCharacter = 30;
+
+			// informacion
+			Services->Display->setAttrs(0, 8);
+			Services->Display->printg("("); 
+					Services->Display->setAttrs(0, 9);
+					Services->Display->printg(Size);
+				Services->Display->setAttrs(0, 7);
+				Services->Display->printg(", "); 
+					Services->Display->CurrentCharacter = 49;
+					Services->Display->setAttrs(0, 10);
+					Services->Display->printg(Pointer); 
+				Services->Display->setAttrs(0, 8);
+			Services->Display->printg(")");
+
+			Services->Display->setAttrs(0, 7);
+			Services->Display->printg(",\n");
+
+			// sumar
+			Index = Index->next;
+		}
+	}
+	else if (StrCmp(command, "sys") == 0)
+	{
+		// Dirección absoluta del puntero Services
+		uintptr_t Direction = (uintptr_t)Services - (uintptr_t)&_heap_start;
+
+		char buf[19];
+		IntToHexString(Direction, buf);
+
+		Services->Display->printg(buf);
+		Services->Display->printg("\n");
+	}
+	else if (StrnCmp(command, "mall ", 5) == 0)
+	{
+		ModuAllocType OldMem = *Services->Memory->MallocType;
+
+		*Services->Memory->MallocType = MemAllocTypePrograms;
+
+		// el str
+		char* str = command + 5;
+		// el buffer
+		char* Buffer = Services->Memory->AllocatePool(sizeof(char) * (StrLen(str) + 1));
+
+		Buffer[(StrLen(str))] = 0;
+
+		// lo pone
+		for (size_t i = 0; i < StrLen(str); i++) Buffer[i] = str[i];
+		
+		// el buffer
+		int Direction = Buffer-&_heap_start;
+
+		char buf[19]; IntToHexString(Direction, buf);
+
+		Services->Display->printg(buf); Services->Display->printg("\n");
+
+		*Services->Memory->MallocType = OldMem;
+	}
+	else if (StrnCmp(command, "free ", 5) == 0)
+	{
+		char* adirection = command + 5;
+
+		// libera todo de la shell y programas del sistema
+		if (StrCmp(adirection, "/sys") == 0)
+		{
+			// indice
+			BlockHeader* Index = heap_start;
+
+			// liberar
+			while (Index->next) 
+			{
+				// liberar
+				if (Index->Type == MemAllocTypeSystem) FreePool(Index->MemoryPtr);
+				Index = Index->next;
+			}
+		}
+		// libera todo los servicios del sistema
+		else if (StrCmp(adirection, "/services") == 0)
+		{
+			// indice
+			BlockHeader* Index = heap_start;
+
+			// liberar
+			while (Index->next) 
+			{
+				// liberar
+				if (Index->Type == MemAllocTypeKernelServices) FreePool(Index->MemoryPtr);
+				Index = Index->next;
+			}
+		}
+		// libera la memoria de programas no usada
+		else if (StrCmp(adirection, "/user") == 0)
+		{
+			// indice
+			BlockHeader* Index = heap_start;
+
+			// liberar
+			while (Index->next) 
+			{
+				// liberar
+				if (Index->Type == MemAllocTypePrograms) FreePool(Index->MemoryPtr);
+				Index = Index->next;
+			}
+		}
+		// liberar todo
+		else if (StrCmp(adirection, "/") == 0)
+		{
+			// indice
+			BlockHeader* Index = heap_start;
+
+			// liberar
+			while (Index->next) 
+			{
+				// liberar
+				FreePool(Index->MemoryPtr);
+				Index = Index->next;
+			}
+		}
+		else 
+		{
+			uintptr_t Direction = HexStringToInt(adirection);
+
+			void* Buffer = (void*)Direction;
+
+			FreePool(Buffer);
+		}
+	}
+	else if (StrCmp(command, "dheap") == 0)
+	{
+		Services->Display->printg("Region de Servicios del Kernel (en heap)\n");
+		InternalDumpHexMemory((void*)Services, sizeof(KernelServices));
+	}
+	else if (StrnCmp(command, "dheap ", 6) == 0)
+	{
+		Services->Display->printg("Mostrar heap personalizado\n");
+
+		char* Sizea = command + 6;
+
+		size_t Size = (size_t)HexStringToInt(Sizea);
+
+		InternalDumpHexMemory(heap_start, Size);
+	}
 	else {
 		char* Params[128];
 		int ParamsCount = StrSplit(command, Params, ' ');
@@ -1255,6 +1532,8 @@ KernelStatus InternalMiniKernelProgram(KernelServices* Services)
 		Services->Misc->Run(Services, "prp", 0);
 		char* Prompt = Services->InputOutput->ReadLine();
 
+		if (StrCmp(Prompt, "exit") == 0) return;
+
 		Services->Display->printg("\n");
 		Services->Misc->Run(Services, Prompt, 0);
 		Services->Memory->FreePool(Prompt);
@@ -1264,6 +1543,9 @@ void k_main()
 {
 	// etapa de arranque prematura aqui se inicializan los servicios basicos
 	// mas no los servicios del kernel donde se iniciaran prototipadamente
+
+	// memoria actual
+	MemoryCurrentSystem = MemAllocTypeKernelServices;
 
 	// inicializar heap para AllocatePool y FreePool
 	InitHeap();
@@ -1362,6 +1644,9 @@ void k_main()
 	// despierto, asi que lanza la shell por que si no que mas lanzar, recuerden que pueden
 	// personalizar su mini programa
 
+	// tipo de memoria del sistema
+	MemoryCurrentSystem = MemAllocTypeSystem;
+
 	Services.Display->printg("\n\n");
 	InternalMiniKernelProgram(&Services);
 }
@@ -1382,8 +1667,8 @@ KernelStatus ProcessCrtByFile(char* name, char* ext, KernelServices* Services)
 		int result = entry(Services);
 	}
 }
-void* AllocatePool(unsigned int size) {
-
+void* InternalAllocatePool(unsigned int size, ModuAllocType Type) 
+{
     BlockHeader* current = free_list;
 
     while (current) {
@@ -1401,6 +1686,10 @@ void* AllocatePool(unsigned int size) {
 
             current->free = 0;
             current->size = size;
+			current->Type = Type;
+		
+			current->MemoryPtr = (char*)current + sizeof(BlockHeader);
+
             return (char*)current + sizeof(BlockHeader);
         }
 
@@ -1412,11 +1701,16 @@ void* AllocatePool(unsigned int size) {
 	InternalModuPanic(KernelStatusNoBudget);
 	return 0; // out of memory
 }
+void* AllocatePool(unsigned int size) 
+{
+   return InternalAllocatePool(size, MemoryCurrentSystem);
+}
 void FreePool(void* ptr) {
     if (!ptr) return;
 
     BlockHeader* block = (BlockHeader*)((char*)ptr - sizeof(BlockHeader));
     block->free = 1;
+	block->Type = MemAllocTypeFreeOrNotExist;
 
     BlockHeader* current = free_list;
 

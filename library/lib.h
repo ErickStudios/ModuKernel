@@ -27,6 +27,9 @@ typedef unsigned long long GrandePositivo;
 
 typedef GrandePositivo     DireccionAValor;
 
+#define BanderaActiva       1
+#define BanderaNoActiva     0
+
 // teclas
 #define EscaneoFlechaArriba KernelSimpleIoSpecKey(1)
 #define EscaneoFlechaAbajo KernelSimpleIoSpecKey(2)

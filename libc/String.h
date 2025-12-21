@@ -66,6 +66,41 @@ void UIntToString(unsigned int value, char* buffer) {
     }
     buffer[j] = '\0';
 }
+int HexStringToInt(const char* Value) {
+    // si el valor es nulo entonces 0
+    if (Value[0] == 0) return 0;
+
+    // detectar prefijo 0x
+    int start = 0;
+    if (Value[0] == '0' && (Value[1] == 'x' || Value[1] == 'X')) {
+        start = 2;
+    }
+
+    int Len = StrLen(Value);
+    int Valor = 0;
+    int Cif = 1;
+
+    // recorrer de derecha a izquierda
+    for (int i = Len - 1; i >= start; i--) {
+        char c = Value[i];
+        int digit;
+
+        if (c >= '0' && c <= '9') {
+            digit = c - '0';
+        } else if (c >= 'A' && c <= 'F') {
+            digit = 10 + (c - 'A');
+        } else if (c >= 'a' && c <= 'f') {
+            digit = 10 + (c - 'a');
+        } else {
+            continue; // ignorar caracteres no hex
+        }
+
+        Valor += digit * Cif;
+        Cif *= 16;
+    }
+
+    return Valor;
+}
 // a string
 void IntToString(int value, char *buffer) {
     char temp[12];

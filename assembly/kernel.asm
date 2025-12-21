@@ -13,13 +13,20 @@ section .multiboot
 	dd 0x00				;flags
 	dd - (0x1BADB002 + 0x00)	;checksum. m+f+c should be zero
 
+; seccion de datos
+section .data
+	; mensaje auxilear de que ha fallado
+	msg db 10,'El kernel ha fallado y se ha regresado al entorno pre-C, reinicie la pc para continuar',10,0
+
 ; seccion de texto y datos
 section .text
 
 ; globalizar start
 global start
-; poner el principio del kernel
-extern k_main	
+
+; funciones
+extern InternalPrintgNonLine		; funcion de impresion
+extern k_main						; funcion principal
 
 ; principal
 start:
@@ -35,6 +42,13 @@ start:
 
 	; aqui si algo salio mal en el arranque aqui se hara un codigo de emergencia
 	; que limpiara la pila y congelara el kernel
+
+	; el mensaje
+    push msg
+	; mandar a imprimir
+	call InternalPrintgNonLine
+	; no hay nada
+    add esp, 4
 
 	; si algo sale mal congelar
 	hlt

@@ -48,6 +48,14 @@ for file in modush/*.c; do
 done
 
 afaf=0
+for file in modush/*.sh; do
+    nameq=$(basename "$file"); name="${nameq%.*}"
+    cp "$file" "disk/SH$afaf.NSH"
+    echo "/sys/$name.sh;SH$afaf;NSH;" >> disk/FSLST.IFS
+    let afaf=afaf+1
+done
+
+afaf=0
 for file in usr/*; do
     name=$(basename "$file")
     cp "$file" "disk/SR$afaf.SRN"
@@ -75,19 +83,11 @@ cat > config/boot/grub/grub.cfg <<'EOF'
 set timeout=12
 set default=0
 
-set color_normal=light-green/light-blue
-set color_highlight=black/cyan
-set gfxmode=1024x768
-set gfxpayload=1024x768x32
-terminal_output gfxterm
-
 menuentry "ModuKernel" {
     multiboot /boot/kernel
     boot
 }
-menuentry "Bash" {
-    bash
-}
+
 EOF
 grub-mkrescue -o build/os.iso config
 

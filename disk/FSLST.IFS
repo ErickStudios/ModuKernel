@@ -4,6 +4,7 @@
 /bin/mouse;BC3;BIN;
 /dev/drv0;DV0;BIN;
 /sys/help;SY0;BIN;
+/sys/frcache.sh;SH0;NSH;
 /home/myScript.sh;SR0;SRN;
 /home/nota.txt;SR1;SRN;
 /home/test1.txt;SR2;SRN;
