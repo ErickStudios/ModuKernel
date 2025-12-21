@@ -29,6 +29,9 @@ char CurrentWorkDirectory[128] = "/";
 unsigned int CwdCurrentCharacter = 1;
 int CwdLevelDir = 1;
 
+// el tamaño del programa
+int ProgramMainSize = 0;
+
 static BlockHeader* heap_start = (BlockHeader*)&_heap_start;
 static BlockHeader* free_list = NULL;
 
@@ -848,14 +851,38 @@ FatFile InternalExtendedFindFile(char* path)
     return fileNull; // no encontrado
 }
 KernelStatus InternalRunBinary(void* buffer, int size, KernelServices* Services) {
+	// datos y cosas
+	uint8_t* ProgramDataAndThings = 0;
+	// si hacer paginacion
+	uint8_t MakePagingEmulator = 0; 
+
+	// longitud anterior del programa
+	int OldSizeProgram = ProgramMainSize;
+
+	// si ya esta en un programa
+	if (MemoryCurrentSystem == MemAllocTypePrograms) MakePagingEmulator = 1;
+
+	// donde carga el programa
+	#define USER_LOAD_ADDR ((uint8_t*)0x00F00000)
+
+	// si se va a hacer paginacion
+	if (MakePagingEmulator) 
+	{
+		// hacer paginacion
+		ProgramDataAndThings = (uint8_t*)AllocatePool(OldSizeProgram);
+
+		// copiar
+		InternalMemoryCopy(ProgramDataAndThings, USER_LOAD_ADDR, OldSizeProgram);
+	}
+
+	// la longitud
+	ProgramMainSize = size;
+
 	// memoria antigua
 	ModuAllocType OldMallocType = MemoryCurrentSystem;
 
 	// memoria de usuario
 	MemoryCurrentSystem = MemAllocTypePrograms;
-
-	// donde carga el programa
-	#define USER_LOAD_ADDR ((uint8_t*)0x00F00000)
 
 	// estructura del tipo de programa
     typedef struct {
@@ -900,6 +927,19 @@ KernelStatus InternalRunBinary(void* buffer, int size, KernelServices* Services)
 
 	// cambiar a ejecucion anterior
 	MemoryCurrentSystem = OldMallocType;
+
+	// setear la longitud
+	ProgramMainSize = OldSizeProgram;
+
+	// regresarlo
+	if (MakePagingEmulator) 
+	{
+		// copiarlo de nuevo
+		InternalMemoryCopy(USER_LOAD_ADDR, ProgramDataAndThings, OldSizeProgram);
+	
+		// liberarlo
+		FreePool(ProgramDataAndThings);
+	}
 
 	// retornar el status
     return Status;

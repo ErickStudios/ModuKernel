@@ -2,6 +2,7 @@
 /bin/calculator;BC1;BIN;
 /bin/helloworld;BC2;BIN;
 /bin/mouse;BC3;BIN;
+/bin/multi;BC4;BIN;
 /dev/drv0;DV0;BIN;
 /sys/help;SY0;BIN;
 /sys/frcache.sh;SH0;NSH;

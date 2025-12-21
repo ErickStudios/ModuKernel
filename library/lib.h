@@ -1,8 +1,9 @@
 // libreria
+#include <stdint.h>
 #include "../services/KernelServices.h"
+#include "../fs/fat12.h"
 
 #include "../libc/String.h"
-#include <stdint.h>
 
 // el tipo de sistema
 typedef KernelServices Sys;

@@ -1,7 +1,7 @@
 /**
 * ABI/user_link.ld
 *
-* archivo de linkeo para ErickABI+NeffiTo
+* archivo de linkeo para ErickABI
 */
 
 /* punto de entrada= ErickMain */
