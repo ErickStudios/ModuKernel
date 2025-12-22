@@ -1,6 +1,8 @@
 
 /* si esta presionandose shift */
 int shift_pressed = 0;
+/* crea memoria internal */
+void* InternalAllocatePool(unsigned int size, ModuAllocType Type);
 /* crea memoria */
 void* AllocatePool(unsigned int size);
 /* inicializa el kernel */

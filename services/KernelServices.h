@@ -1,5 +1,7 @@
 #ifndef KernelServicesDotH
 #define KernelServicesDotH
+// incluir los encabezados
+#include <stdint.h>
 // incluir los servicios
 #include "DisplayServices.h"
 #include "MemoryServices.h"
@@ -43,6 +45,15 @@ typedef struct _KernelDateTime {
     /* contiene el segundo actual */
     int second;
 } KernelDateTime;
+/* informacion del sistema */
+typedef struct _KernelSystemInfo
+{
+    /* puntero al ModuWorld (asi se llama? no preguntes por que), 
+    donde esta el programa cargado en la ram */
+    uint8_t* ModuWorldPtr;
+    /* puntero al tamaño del programa cargado en la ram */
+    int* ProgramSizePtr;
+} KernelSystemInfo; 
 /* el tipo para ejecutar un comando */
 typedef void (*KernelServicesExecuteCommand)(struct _KernelServices* Services, char* command, int len);
 /* el tipo para engendrar servicios */
@@ -107,5 +118,7 @@ typedef struct _KernelServices {
     TimeServices* Time;
     /* servicios de musica */
     MusicServices* Music;
+    /* informacion del sistema */
+    KernelSystemInfo* Info;
 } KernelServices;
 #endif

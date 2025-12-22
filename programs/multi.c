@@ -8,7 +8,7 @@ KernelStatus ErickMain(KernelServices* Services)
     char em1[] = "apple banana\n";
     char em2[] = "foo bar\n";
 
-    FatFile OtherFile = Services->File->OpenFile("/bin/calculator");
+    FatFile OtherFile = Services->File->OpenFile("/bin/bench");
 
     void* content; int size;
 
@@ -18,10 +18,11 @@ KernelStatus ErickMain(KernelServices* Services)
     if (!(_StatusError(OpenFileBin)))
         Services->Misc->RunBinary(content, size, Services);
     else 
+    {
+        Services->Memory->FreePool(content);
         return OpenFileBin;
+    }
     
-    Services->Memory->FreePool(content);
-
     Services->Display->printg(em);
     Services->Display->printg(em1);
     Services->Display->printg(em2);

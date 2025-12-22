@@ -8,8 +8,8 @@
 ENTRY(ErickMain)
 
 SECTIONS {
-  /* Dirección fija donde se ejecutará el programa */
-  . = 0x00F00000;
+  /* Dirección fija donde se ejecutará el programa , el ModuWorld*/
+  . = 0x0AFB032C;
 
   /* Encabezado (16 bytes) al inicio de la imagen */
   .header : {

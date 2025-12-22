@@ -13,12 +13,17 @@ Operacion PedirOperacion(KernelServices* Servicios)
 {
     Operacion Op;
     Servicios->Display->printg("1: ");
-    Op.nums[0] = Expresion(Servicios->InputOutput->ReadLine());
+    char* num0 = Servicios->InputOutput->ReadLine();
+    Op.nums[0] = Expresion(num0);
     Servicios->Display->printg("\n");
 
+    char* num1 = Servicios->InputOutput->ReadLine();
     Servicios->Display->printg("2: ");
-    Op.nums[1] = Expresion(Servicios->InputOutput->ReadLine());
+    Op.nums[1] = Expresion(num1);
     Servicios->Display->printg("\n");
+
+    Servicios->Memory->FreePool(num0);
+    Servicios->Memory->FreePool(num1);
 
     return Op;
 }

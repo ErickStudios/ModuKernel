@@ -719,6 +719,7 @@ void InitializeKernel(KernelServices* Services)
     KernelMiscServices* Msc = AllocatePool(sizeof(KernelMiscServices));
     TimeServices* Tim = AllocatePool(sizeof(TimeServices));
     MusicServices* Music = AllocatePool(sizeof(MusicServices));
+	KernelSystemInfo* Info = AllocatePool(sizeof(KernelSystemInfo));
 
     // comprobar allocs
     if (!Dsp || !Mem || !IO || !Dsk || !Msc) {
@@ -742,6 +743,7 @@ void InitializeKernel(KernelServices* Services)
     Services->Misc    		= Msc;
 	Services->Time			= Tim;
 	Services->Music			= Music;
+	Services->Info			= Info;
 
     // servicios principales
     Services->Misc->Run       = &InternalSysCommandExecute;
@@ -795,6 +797,10 @@ void InitializeKernel(KernelServices* Services)
 	// musica
 	Music->PlayTone	= &InternalMusicSetTone;
 	Music->Mute		= &InternalMusicMuteTone;
+
+	// informacion
+	Info->ModuWorldPtr  = ((uint8_t*)0x0AFB032C);
+	Info->ProgramSizePtr= &ProgramMainSize;
 
     // hacer global la estructura principal
     GlobalServices = Services;
@@ -863,13 +869,13 @@ KernelStatus InternalRunBinary(void* buffer, int size, KernelServices* Services)
 	if (MemoryCurrentSystem == MemAllocTypePrograms) MakePagingEmulator = 1;
 
 	// donde carga el programa
-	#define USER_LOAD_ADDR ((uint8_t*)0x00F00000)
+	#define USER_LOAD_ADDR Services->Info->ModuWorldPtr
 
 	// si se va a hacer paginacion
 	if (MakePagingEmulator) 
 	{
 		// hacer paginacion
-		ProgramDataAndThings = (uint8_t*)AllocatePool(OldSizeProgram);
+		ProgramDataAndThings = (uint8_t*)InternalAllocatePool(OldSizeProgram, MemAllocTypeProgramsStackMemory);
 
 		// copiar
 		InternalMemoryCopy(ProgramDataAndThings, USER_LOAD_ADDR, OldSizeProgram);
@@ -1300,6 +1306,26 @@ void InternalSysCommandExecute(KernelServices* Services, char* command, int lena
 		Services->Display->printg(Second);
 		Services->Display->printg("\n");
 	}
+	else if (StrCmp(command, "date") == 0)
+	{
+		KernelDateTime Time;
+		Services->Misc->GetTime(&Time);
+
+		char Year[3];
+		char Month[3];
+		char Day[3];
+
+		IntToString(Time.year, Year);
+		IntToString2Digits(Time.month, Month);
+		IntToString2Digits(Time.day, Day);
+
+		Services->Display->printg(Day);
+		Services->Display->printg("/");
+		Services->Display->printg(Month);
+		Services->Display->printg("/");
+		Services->Display->printg(Year);
+		Services->Display->printg("\n");
+	}
 	else if (StrCmp(command, "modupanic") == 0) InternalModuPanic(KernelStatusSuccess);
 	else if (StrCmp(command, "") == 0);
 	else if (StrCmp(command, "memmap") == 0)
@@ -1486,9 +1512,8 @@ void InternalSysCommandExecute(KernelServices* Services, char* command, int lena
 
 		char* Sizea = command + 6;
 
-		size_t Size = (size_t)HexStringToInt(Sizea);
-
-		InternalDumpHexMemory(heap_start, Size);
+		if (StrnCmp(Sizea, "/mw ", 4) == 0) InternalDumpHexMemory(Services->Info->ModuWorldPtr, (size_t)HexStringToInt(Sizea + 4));
+		else InternalDumpHexMemory(heap_start, (size_t)HexStringToInt(Sizea));
 	}
 	else {
 		char* Params[128];

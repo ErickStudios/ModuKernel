@@ -26,6 +26,10 @@ typedef enum _ModuAllocType
     MemAllocTypeSystem,
     /* el tipo de memoria liberada o desconozida */
     MemAllocTypeFreeOrNotExist,
+    /* el tipo de memoria de pila de programas, esta memoria se
+    reserva para apilar los programas uno por uno para poder hacer
+    un stack de programas y no sobreescribir ninguno de los datos*/
+    MemAllocTypeProgramsStackMemory,
     /* el tipo de memoria ultimo */
     MemAllocTypeMaxMemoryType
 } ModuAllocType;
