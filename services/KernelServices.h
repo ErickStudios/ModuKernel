@@ -1,8 +1,7 @@
 #ifndef KernelServicesDotH
 #define KernelServicesDotH
-// incluir los encabezados
-#include <stdint.h>
 // incluir los servicios
+#include "basic.h"
 #include "DisplayServices.h"
 #include "MemoryServices.h"
 #include "IOServices.h"
@@ -33,17 +32,17 @@ typedef enum _KernelStatus {
 /* el tipo de hora y fecha que es una estructura para hacerlo mas limpio */
 typedef struct _KernelDateTime {
     /* contiene el año actual */
-    int year;
+    int32_t year;
     /* contiene el mes actual */
-    int month; 
+    int32_t month; 
     /* contiene el dia actual */
-    int day;
+    int32_t day;
     /* contiene la hora actual */
-    int hour;
+    int32_t hour;
     /* contiene el minuto actual */
-    int minute;
+    int32_t minute;
     /* contiene el segundo actual */
-    int second;
+    int32_t second;
 } KernelDateTime;
 /* informacion del sistema */
 typedef struct _KernelSystemInfo
@@ -52,7 +51,10 @@ typedef struct _KernelSystemInfo
     donde esta el programa cargado en la ram */
     uint8_t* ModuWorldPtr;
     /* puntero al tamaño del programa cargado en la ram */
-    int* ProgramSizePtr;
+    int32_t* ProgramSizePtr;
+    /* puntero a la memoria de video de el kernel y por lo tanto de
+    VGA */
+    uint8_t* VideoMemPtr;
 } KernelSystemInfo; 
 /* el tipo para ejecutar un comando */
 typedef void (*KernelServicesExecuteCommand)(struct _KernelServices* Services, char* command, int len);
@@ -89,9 +91,9 @@ typedef struct _KernelMiscServices {
     KernelServicesGetTimeDate GetTime;
     /* variable que apunta a los parametros extras con los cuales se ejecuta
     un programa */
-    void*** Paramaters;
+    ObjectAny** Paramaters;
     /* variable que apunta a la longitud de los parametros */
-    int* ParamsCount;
+    int32_t* ParamsCount;
     /* funcion para obtener el numero de ciclos de relog que transcurrieron desde
     que inicio la maquina ya sea qemu o maquina real */
     KernelServicesGetTicks GetTicks;
@@ -103,7 +105,7 @@ typedef struct _KernelMiscServices {
 para que sea mas comprensible , organizado y facil de usar */
 typedef struct _KernelServices {
     /* propiedad que contiene un puntero a la version actual de los servicios */
-    unsigned int* ServicesVersion;
+    uint32_t* ServicesVersion;
     /* servicio para controlar la pantalla y la consola*/
     DisplayServices* Display;
     /* servicio para administrar memoria dinamica */

@@ -1,6 +1,7 @@
 #ifndef DisplayServicesDotH
 #define DisplayServicesDotH
-/* el tipo
+#include "basic.h"
+/* el tipo */
 struct _DisplayServices;
 /* el tipo de impresion interna */
 typedef void (*KernelSimpleDisplayPrintgInternal)(char* msg, unsigned int line);
@@ -14,17 +15,21 @@ typedef void (*KernelSimpleDisplayClearScreen)();
 typedef void (*KernelSimpleDisplaySetAttrs)(char bg, char fg);
 /* el tipo de setteo */
 typedef void (*KernelSimpleDisplaySetAsDefault)(struct _DisplayServices* this);
+/* el tipo de pantalla iniciando */
+typedef void (*KernelSimpleDisplayInitGopScreen)();
+/* el tipo para imprimir pixeles */
+typedef void (*KernelSimpleDisplayDrawRectangle)(uint8_t color, int x, int y, int size);
 /* el tipo de servicios de pantalla */
 typedef struct _DisplayServices {
     /* variable que contiene la linea actual donde el cursor de escritura de
     printg se encuentra ubicado */
-    int CurrentLine;
+    int32_t CurrentLine;
     /* variable que contiene la colummna actual donde el cursor de escritura de
     printg se encuentra ubicado */
-    int CurrentCharacter;
+    int32_t CurrentCharacter;
     /* variable que contiene el atributo actual Fondo y Texto que el printg
     utilizara para imprimir */
-    char CurrentAttrs;
+    int8_t CurrentAttrs;
     /* funcion que ajusta los punteros que usa printg a las propiedades CurrentLine
     , CurrentCharacter y CurrentAttrs para que printg los obtenga automaticamente ,
     no se preocupen, el kernel ya hace esto por defecto durante el arranque asi que
@@ -56,5 +61,16 @@ typedef struct _DisplayServices {
     el color del texto (0x0 a 0xF), esto ajusta los punteros a la estructura
     de display actual que se puede cambiar con la funcion Set */
     KernelSimpleDisplaySetAttrs setAttrs; 
+    /* funcion para inicializar la pantalla grafica, lamentablemente al probarlo
+    no se puede volver a el modo texto por lo que el sistema necesita vivir en
+    modo grafico al hacerlo , aparte disclamer, usa muchos bugs para despertar
+    por completo la tarjeta grafica*/
+    KernelSimpleDisplayInitGopScreen ActivatePixel;
+    /* funcion para dibujar un rectangulo , el es el color del esquema de
+    colores (0-255) para dibujarlo, el segundo y tercer parametro son las
+    posiciones X,Y del pixel a dibujar, el cuarto es el tamaño del rectangulo
+    en pixeles, no hay tamaño x ni tamaño y ya que esto utiliza la cantidad
+    de pixeles del cuarto parametro para eso*/
+    KernelSimpleDisplayDrawRectangle DrawRectangle;
 } DisplayServices;
 #endif

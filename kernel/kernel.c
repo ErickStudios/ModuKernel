@@ -2,6 +2,7 @@
 #include "../services/KernelServices.h"
 #include "kernel.h"
 #include "../fs/fat12.h"
+#include "./vga/BitMaps.h"
 
 // incluir funciones y prototipos
 #include "../functions/misc_main.h"
@@ -35,6 +36,928 @@ int ProgramMainSize = 0;
 static BlockHeader* heap_start = (BlockHeader*)&_heap_start;
 static BlockHeader* free_list = NULL;
 
+uint8_t Colorea = 20;
+
+extern void config_mode();
+extern void unconfig_mode();
+extern void draw_bg(uint8_t Color);
+#ifdef __cplusplus
+extern "C" {
+#endif
+void InternalDrawPixel(uint8_t color, int x, int y, int size);
+#ifdef __cplusplus
+}
+#endif
+extern void InternalGopScreenInit();
+extern void InternalSendCharToSerial(char ch);
+extern uint8_t InternalGrapichalFlag;
+
+void DrawBitmap(const uint8_t* BitMap, int x, int y, uint8_t color) {
+    int height = 7;
+    int width  = 6;
+    for (int row = 0; row < height; row++) {
+        uint8_t line = BitMap[row];
+        for (int col = 0; col < width; col++) {
+            if (line & (1 << (7 - col))) {   // ← invertimos el orden
+                InternalDrawPixel(
+					color, 
+					(x + col) + ((y + row) * 80), 
+					0, 
+					1);
+            }
+        }
+    }
+}
+
+void DrawLetter(int x, int y, char letter, uint8_t color)
+{
+
+	unsigned char au_bitmap[7] = {
+		0b000000, //  ..... 
+		0b011000, //  .###.  
+		0b100100, //  #...#  
+		0b111100, //  ##### 
+		0b100100, //  #...# 
+		0b100100, //  #...# 
+		0b000000 // ..... 
+	};
+	unsigned char al_bitmap[7] = {
+		0b0000000, // .....
+		0b0000000, // ..... 
+		0b0110100, // .##.# 
+		0b1001100, // #..## 
+		0b1001100, // #..## 
+		0b0110100, // .##.# 
+		0b0000000 // ..... 
+	};
+
+	unsigned char bu_bitmap[7] = {
+		0b000000, // .....
+		0b111000, // .###. 
+		0b100100, // #...# 
+		0b111000, // ####. 
+		0b100100, // #...# 
+		0b011100, // .###. 
+		0b000000 // ..... 
+	};
+	unsigned char bl_bitmap[7] = {
+		0b100000, // #....
+		0b100000, // #.... 
+		0b111000, // ####. 
+		0b100100, // #...# 
+		0b100100, // #...# 
+		0b011000, // .###. 
+		0b000000 // ..... 
+	};
+
+	unsigned char cu_bitmap[7] = {
+		0b000000, // .....
+		0b011100, // .###. 
+		0b100010, // #...# 
+		0b100000, // #.... 
+		0b100010, // #...# 
+		0b011100, // .###. 
+		0b000000 // ..... 
+	};
+	unsigned char cl_bitmap[7] = {
+		0b000000, // .....
+		0b000000, // ..... 
+		0b011100, // .###. 
+		0b100000, // #.... 
+		0b100000, // #.... 
+		0b011100, // .###. 
+		0b000000 // ..... 
+	};
+
+	// Letra D (mayúscula)
+	unsigned char Du_bitmap[7] = {
+		0b000000, // .....
+		0b111000, // ###..
+		0b100100, // #..#.
+		0b100100, // #..#.
+		0b100100, // #..#.
+		0b111000, // ###..
+		0b000000  // .....
+	};
+
+	// Letra d (minúscula)
+	unsigned char Dl_bitmap[7] = {
+		0b000100, // ...#.
+		0b000100, // ...#.
+		0b011100, // .###.
+		0b100100, // #..#.
+		0b100100, // #..#.
+		0b011100, // .###.
+		0b000000  // .....
+	};
+
+	// Letra E (mayúscula)
+	unsigned char Eu_bitmap[7] = {
+		0b000000, // .....
+		0b111100, // ####.
+		0b100000, // #....
+		0b111000, // ###..
+		0b100000, // #....
+		0b111100, // ####.
+		0b000000  // .....
+	};
+
+	// Letra e (minúscula)
+	unsigned char El_bitmap[7] = {
+		0b000000, // .....
+		0b011100, // .###.
+		0b100100, // #..#.
+		0b111100, // ####.
+		0b100000, // #....
+		0b011100, // .###.
+		0b000000  // .....
+	};
+
+	// Letra F (mayúscula)
+	unsigned char Fu_bitmap[7] = {
+		0b000000, // .....
+		0b111100, // ####.
+		0b100000, // #....
+		0b111000, // ###..
+		0b100000, // #....
+		0b100000, // #....
+		0b000000  // .....
+	};
+
+	// Letra f (minúscula)
+	unsigned char Fl_bitmap[7] = {
+		0b001100, // ..##.
+		0b010000, // .#...
+		0b111000, // ###..
+		0b010000, // .#...
+		0b010000, // .#...
+		0b010000, // .#...
+		0b000000  // .....
+	};
+
+	// Letra G (mayúscula)
+	unsigned char Gu_bitmap[7] = {
+		0b000000, // .....
+		0b011100, // .###.
+		0b100000, // #....
+		0b101100, // #.##.
+		0b100100, // #..#.
+		0b011100, // .###.
+		0b000000  // .....
+	};
+
+	// Letra g (minúscula)
+	unsigned char Gl_bitmap[7] = {
+		0b000000, // .....
+		0b011100, // .###.
+		0b100100, // #..#.
+		0b011100, // .###.
+		0b000100, // ...#.
+		0b011000, // .##..
+		0b000000  // .....
+	};
+
+	// Letra H (mayúscula)
+	unsigned char Hu_bitmap[7] = {
+		0b000000, // .....
+		0b100100, // #..#.
+		0b100100, // #..#.
+		0b111100, // ####.
+		0b100100, // #..#.
+		0b100100, // #..#.
+		0b000000  // .....
+	};
+
+	// Letra h (minúscula)
+	unsigned char Hl_bitmap[7] = {
+		0b100000, // #....
+		0b100000, // #....
+		0b111000, // ###..
+		0b100100, // #..#.
+		0b100100, // #..#.
+		0b100100, // #..#.
+		0b000000  // .....
+	};
+
+	// Letra I (mayúscula)
+	unsigned char Iu_bitmap[7] = {
+		0b000000, // .....
+		0b111000, // ###..
+		0b010000, // .#...
+		0b010000, // .#...
+		0b010000, // .#...
+		0b111000, // ###..
+		0b000000  // .....
+	};
+
+	// Letra i (minúscula)
+	unsigned char Il_bitmap[7] = {
+		0b000000, // .....
+		0b010000, // .#...
+		0b000000, // .....
+		0b110000, // ##...
+		0b010000, // .#...
+		0b010000, // .#...
+		0b000000  // .....
+	};
+
+	// Letra J (mayúscula)
+	unsigned char Ju_bitmap[7] = {
+		0b000000, // .....
+		0b111100, // ####.
+		0b000100, // ...#.
+		0b000100, // ...#.
+		0b100100, // #..#.
+		0b011000, // .##..
+		0b000000  // .....
+	};
+
+	// Letra j (minúscula)
+	unsigned char Jl_bitmap[7] = {
+		0b000000, // .....
+		0b001000, // ..#..
+		0b000000, // .....
+		0b011000, // .##..
+		0b001000, // ..#..
+		0b001000, // ..#..
+		0b110000  // ##...
+	};
+
+	// Letra K (mayúscula)
+	unsigned char Ku_bitmap[7] = {
+		0b000000, // .....
+		0b100100, // #..#.
+		0b101000, // #.#..
+		0b110000, // ##...
+		0b101000, // #.#..
+		0b100100, // #..#.
+		0b000000  // .....
+	};
+
+	// Letra k (minúscula)
+	unsigned char Kl_bitmap[7] = {
+		0b100000, // #....
+		0b100000, // #....
+		0b101000, // #.#..
+		0b110000, // ##...
+		0b101000, // #.#..
+		0b100100, // #..#.
+		0b000000  // .....
+	};
+	// Letra L (mayúscula)
+	unsigned char Lu_bitmap[7] = {
+		0b000000, // .....
+		0b100000, // #....
+		0b100000, // #....
+		0b100000, // #....
+		0b100000, // #....
+		0b111100, // ####.
+		0b000000  // .....
+	};
+
+	// Letra l (minúscula)
+	unsigned char Ll_bitmap[7] = {
+		0b100000, // #....
+		0b100000, // #....
+		0b100000, // #....
+		0b100000, // #....
+		0b100000, // #....
+		0b011000, // .##..
+		0b000000  // .....
+	};
+
+	// Letra M (mayúscula)
+	unsigned char Mu_bitmap[7] = {
+		0b000000, // .....
+		0b100100, // #..#.
+		0b111100, // ####.
+		0b111100, // ####.
+		0b100100, // #..#.
+		0b100100, // #..#.
+		0b000000  // .....
+	};
+
+	// Letra m (minúscula)
+	unsigned char Ml_bitmap[7] = {
+		0b000000, // .....
+		0b000000, // .....
+		0b110100, // ##.#.
+		0b101100, // #.##.
+		0b100100, // #..#.
+		0b100100, // #..#.
+		0b000000  // .....
+	};
+
+	// Letra N (mayúscula)
+	unsigned char Nu_bitmap[7] = {
+		0b000000, // .....
+		0b100100, // #..#.
+		0b110100, // ##.#.
+		0b101100, // #.##.
+		0b100100, // #..#.
+		0b100100, // #..#.
+		0b000000  // .....
+	};
+
+	// Letra n (minúscula)
+	unsigned char Nl_bitmap[7] = {
+		0b000000, // .....
+		0b000000, // .....
+		0b111000, // ###..
+		0b100100, // #..#.
+		0b100100, // #..#.
+		0b100100, // #..#.
+		0b000000  // .....
+	};
+
+	// Letra O (mayúscula)
+	unsigned char Ou_bitmap[7] = {
+		0b000000, // .....
+		0b011000, // .##..
+		0b100100, // #..#.
+		0b100100, // #..#.
+		0b100100, // #..#.
+		0b011000, // .##..
+		0b000000  // .....
+	};
+
+	// Letra o (minúscula)
+	unsigned char Ol_bitmap[7] = {
+		0b000000, // .....
+		0b000000, // .....
+		0b011000, // .##..
+		0b100100, // #..#.
+		0b100100, // #..#.
+		0b011000, // .##..
+		0b000000  // .....
+	};
+
+	// Letra P (mayúscula)
+	unsigned char Pu_bitmap[7] = {
+		0b000000, // .....
+		0b111000, // ###..
+		0b100100, // #..#.
+		0b111000, // ###..
+		0b100000, // #....
+		0b100000, // #....
+		0b000000  // .....
+	};
+
+	// Letra p (minúscula)
+	unsigned char Pl_bitmap[7] = {
+		0b000000, // .....
+		0b000000, // .....
+		0b111000, // ###..
+		0b100100, // #..#.
+		0b111000, // ###..
+		0b100000, // #....
+		0b100000  // #....
+	};
+
+	// Letra Q (mayúscula)
+	unsigned char Qu_bitmap[7] = {
+		0b000000, // .....
+		0b011000, // .##..
+		0b100100, // #..#.
+		0b100100, // #..#.
+		0b101000, // #.#..
+		0b010100, // .#.#.
+		0b000000  // .....
+	};
+
+	// Letra q (minúscula)
+	unsigned char Ql_bitmap[7] = {
+		0b000000, // .....
+		0b000000, // .....
+		0b011100, // .###.
+		0b100100, // #..#.
+		0b011100, // .###.
+		0b000100, // ...#.
+		0b000100  // ...#.
+	};
+
+	// Letra R (mayúscula)
+	unsigned char Ru_bitmap[7] = {
+		0b000000, // .....
+		0b111000, // ###..
+		0b100100, // #..#.
+		0b111000, // ###..
+		0b101000, // #.#..
+		0b100100, // #..#.
+		0b000000  // .....
+	};
+
+	// Letra r (minúscula)
+	unsigned char Rl_bitmap[7] = {
+		0b000000, // .....
+		0b000000, // .....
+		0b101100, // #.##.
+		0b110000, // ##...
+		0b100000, // #....
+		0b100000, // #....
+		0b000000  // .....
+	};
+
+	// Letra S (mayúscula)
+	unsigned char Su_bitmap[7] = {
+		0b000000, // .....
+		0b011100, // .###.
+		0b100000, // #....
+		0b011000, // .##..
+		0b000100, // ...#.
+		0b111000, // ###..
+		0b000000  // .....
+	};
+
+	// Letra s (minúscula)
+	unsigned char Sl_bitmap[7] = {
+		0b000000, // .....
+		0b011100, // .###.
+		0b010000, // .#...
+		0b001000, // ..#..
+		0b000100, // ...#.
+		0b011000, // .##..
+		0b000000  // .....
+	};
+
+	// Letra T (mayúscula)
+	unsigned char Tu_bitmap[7] = {
+		0b000000, // .....
+		0b111100, // ####.
+		0b010000, // .#...
+		0b010000, // .#...
+		0b010000, // .#...
+		0b010000, // .#...
+		0b000000  // .....
+	};
+
+	// Letra t (minúscula)
+	unsigned char Tl_bitmap[7] = {
+		0b010000, // .#...
+		0b010000, // .#...
+		0b111000, // ###..
+		0b010000, // .#...
+		0b010000, // .#...
+		0b001000, // ..#..
+		0b000000  // .....
+	};
+
+	// Letra U (mayúscula)
+	unsigned char Uu_bitmap[7] = {
+		0b000000, // .....
+		0b100100, // #..#.
+		0b100100, // #..#.
+		0b100100, // #..#.
+		0b100100, // #..#.
+		0b011000, // .##..
+		0b000000  // .....
+	};
+
+	// Letra u (minúscula)
+	unsigned char Ul_bitmap[7] = {
+		0b000000, // .....
+		0b000000, // .....
+		0b100100, // #..#.
+		0b100100, // #..#.
+		0b100100, // #..#.
+		0b011100, // .###.
+		0b000000  // .....
+	};
+
+	// Letra V (mayúscula)
+	unsigned char Vu_bitmap[7] = {
+		0b000000, // .....
+		0b100100, // #..#.
+		0b100100, // #..#.
+		0b100100, // #..#.
+		0b011000, // .##..
+		0b010000, // .#...
+		0b000000  // .....
+	};
+
+	// Letra v (minúscula)
+	unsigned char Vl_bitmap[7] = {
+		0b000000, // .....
+		0b000000, // .....
+		0b100100, // #..#.
+		0b100100, // #..#.
+		0b011000, // .##..
+		0b010000, // .#...
+		0b000000  // .....
+	};
+
+	// Letra W (mayúscula)
+	unsigned char Wu_bitmap[7] = {
+		0b000000, // .....
+		0b100100, // #..#.
+		0b100100, // #..#.
+		0b111100, // ####.
+		0b111100, // ####.
+		0b100100, // #..#.
+		0b000000  // .....
+	};
+
+	// Letra w (minúscula)
+	unsigned char Wl_bitmap[7] = {
+		0b000000, // .....
+		0b000000, // .....
+		0b100100, // #..#.
+		0b111100, // ####.
+		0b111100, // ####.
+		0b100100, // #..#.
+		0b000000  // .....
+	};
+
+	// Letra X (mayúscula)
+	unsigned char Xu_bitmap[7] = {
+		0b000000, // .....
+		0b100100, // #..#.
+		0b011000, // .##..
+		0b010000, // .#...
+		0b011000, // .##..
+		0b100100, // #..#.
+		0b000000  // .....
+	};
+
+	// Letra x (minúscula)
+	unsigned char Xl_bitmap[7] = {
+		0b000000, // .....
+		0b000000, // .....
+		0b100100, // #..#.
+		0b011000, // .##..
+		0b011000, // .##..
+		0b100100, // #..#.
+		0b000000  // .....
+	};
+
+	// Letra Y (mayúscula)
+	unsigned char Yu_bitmap[7] = {
+		0b000000, // .....
+		0b100100, // #..#.
+		0b011000, // .##..
+		0b010000, // .#...
+		0b010000, // .#...
+		0b010000, // .#...
+		0b000000  // .....
+	};
+
+	// Letra y (minúscula)
+	unsigned char Yl_bitmap[7] = {
+		0b000000, // .....
+		0b000000, // .....
+		0b100100, // #..#.
+		0b011000, // .##..
+		0b010000, // .#...
+		0b010000, // .#...
+		0b100000  // #....
+	};
+
+	// Letra Z (mayúscula)
+	unsigned char Zu_bitmap[7] = {
+		0b000000, // .....
+		0b111100, // ####.
+		0b001000, // ..#..
+		0b010000, // .#...
+		0b100000, // #....
+		0b111100, // ####.
+		0b000000  // .....
+	};
+
+	// Letra z (minúscula)
+	unsigned char Zl_bitmap[7] = {
+		0b000000, // .....
+		0b000000, // .....
+		0b111100, // ####.
+		0b001000, // ..#..
+		0b010000, // .#...
+		0b111100, // ####.
+		0b000000  // .....
+	};
+// Corchete abierto [
+unsigned char openBracket_bitmap[7] = {
+    0b011100, // .###.
+    0b010000, // .#...
+    0b010000, // .#...
+    0b010000, // .#...
+    0b010000, // .#...
+    0b011100, // .###.
+    0b000000  // .....
+};
+
+// Corchete cerrado ]
+unsigned char closeBracket_bitmap[7] = {
+    0b011100, // .###.
+    0b000100, // ...#.
+    0b000100, // ...#.
+    0b000100, // ...#.
+    0b000100, // ...#.
+    0b011100, // .###.
+    0b000000  // .....
+};
+
+// Paréntesis abierto (
+unsigned char openParen_bitmap[7] = {
+    0b001100, // ..##.
+    0b010000, // .#...
+    0b010000, // .#...
+    0b010000, // .#...
+    0b010000, // .#...
+    0b001100, // ..##.
+    0b000000  // .....
+};
+
+// Paréntesis cerrado )
+unsigned char closeParen_bitmap[7] = {
+    0b011000, // .##..
+    0b000100, // ...#.
+    0b000100, // ...#.
+    0b000100, // ...#.
+    0b000100, // ...#.
+    0b011000, // .##..
+    0b000000  // .....
+};
+
+// Admiración !
+unsigned char exclam_bitmap[7] = {
+    0b010000, // .#...
+    0b010000, // .#...
+    0b010000, // .#...
+    0b010000, // .#...
+    0b000000, // .....
+    0b010000, // .#...
+    0b000000  // .....
+};
+
+// Comillas "
+unsigned char quote_bitmap[7] = {
+    0b101000, // #.#..
+    0b101000, // #.#..
+    0b000000, // .....
+    0b000000, // .....
+    0b000000, // .....
+    0b000000, // .....
+    0b000000  // .....
+};
+
+// Numeral #
+unsigned char hash_bitmap[7] = {
+    0b010100, // .#.#.
+    0b111110, // #####
+    0b010100, // .#.#.
+    0b111110, // #####
+    0b010100, // .#.#.
+    0b000000, // .....
+    0b000000  // .....
+};
+
+// Dólar $
+unsigned char dollar_bitmap[7] = {
+    0b011100, // .###.
+    0b101000, // #.#..
+    0b011000, // .##..
+    0b001100, // ..##.
+    0b101100, // #.##.
+    0b011000, // .##..
+    0b000000  // .....
+};
+
+// Porcentaje %
+unsigned char percent_bitmap[7] = {
+    0b110010, // ##..#
+    0b110100, // ##.#.
+    0b001000, // ..#..
+    0b010000, // .#...
+    0b101100, // #.##.
+    0b100110, // #..##
+    0b000000  // .....
+};
+
+// Ampersand &
+unsigned char amp_bitmap[7] = {
+    0b011000, // .##..
+    0b100100, // #..#.
+    0b011000, // .##..
+    0b101100, // #.##.
+    0b100100, // #..#.
+    0b011010, // .##.#
+    0b000000  // .....
+};
+
+// Slash /
+unsigned char slash_bitmap[7] = {
+    0b000100, // ...#.
+    0b001000, // ..#..
+    0b010000, // .#...
+    0b010000, // .#...
+    0b100000, // #....
+    0b000000, // .....
+    0b000000  // .....
+};
+
+// Igual =
+unsigned char equal_bitmap[7] = {
+    0b000000, // .....
+    0b111100, // ####.
+    0b000000, // .....
+    0b111100, // ####.
+    0b000000, // .....
+    0b000000, // .....
+    0b000000  // .....
+};
+
+// Dos puntos :
+unsigned char colon_bitmap[7] = {
+    0b000000, // .....
+    0b010000, // .#...
+    0b000000, // .....
+    0b000000, // .....
+    0b010000, // .#...
+    0b000000, // .....
+    0b000000  // .....
+};
+
+// Números 1–9 y 0
+unsigned char num1_bitmap[7] = {
+    0b001000, // ..#..
+    0b011000, // .##..
+    0b001000, // ..#..
+    0b001000, // ..#..
+    0b001000, // ..#..
+    0b011100, // .###.
+    0b000000  // .....
+};
+
+unsigned char num2_bitmap[7] = {
+    0b011000, // .##..
+    0b100100, // #..#.
+    0b001000, // ..#..
+    0b010000, // .#...
+    0b100000, // #....
+    0b111100, // ####.
+    0b000000  // .....
+};
+
+unsigned char num3_bitmap[7] = {
+    0b111000, // ###..
+    0b000100, // ...#.
+    0b011000, // .##..
+    0b000100, // ...#.
+    0b000100, // ...#.
+    0b111000, // ###..
+    0b000000  // .....
+};
+
+unsigned char num4_bitmap[7] = {
+    0b001100, // ..##.
+    0b010100, // .#.#.
+    0b100100, // #..#.
+    0b111100, // ####.
+    0b000100, // ...#.
+    0b000100, // ...#.
+    0b000000  // .....
+};
+
+unsigned char num5_bitmap[7] = {
+    0b111100, // ####.
+    0b100000, // #....
+    0b111000, // ###..
+    0b000100, // ...#.
+    0b000100, // ...#.
+    0b111000, // ###..
+    0b000000  // .....
+};
+
+unsigned char num6_bitmap[7] = {
+    0b011100, // .###.
+    0b100000, // #....
+    0b111000, // ###..
+    0b100100, // #..#.
+    0b100100, // #..#.
+    0b011000, // .##..
+    0b000000  // .....
+};
+
+unsigned char num7_bitmap[7] = {
+    0b111100, // ####.
+    0b000100, // ...#.
+    0b001000, // ..#..
+    0b010000, // .#...
+    0b010000, // .#...
+    0b010000, // .#...
+    0b000000  // .....
+};
+
+unsigned char num8_bitmap[7] = {
+    0b011000, // .##..
+    0b100100, // #..#.
+    0b011000, // .##..
+    0b100100, // #..#.
+    0b100100, // #..#.
+    0b011000, // .##..
+    0b000000  // .....
+};
+
+unsigned char num9_bitmap[7] = {
+    0b011000, // .##..
+    0b100100, // #..#.
+    0b011100, // .###.
+    0b000100, // ...#.
+    0b000100, // ...#.
+    0b011000, // .##..
+    0b000000  // .....
+};
+
+unsigned char num0_bitmap[7] = {
+    0b011000, //
+	0b100100,
+	0b100100,
+	0b100100,
+	0b100100,
+	0b011000,
+	0b000000,
+
+};
+
+	int realx = (x * 5);
+	int realy = (y * 8);
+
+	if (letter == 'a') DrawBitmap(al_bitmap, realx, realy, color);
+	else if (letter == 'A') DrawBitmap(au_bitmap, realx, realy, color);
+	else if (letter == 'b') DrawBitmap(bl_bitmap, realx, realy, color);
+	else if (letter == 'B') DrawBitmap(bu_bitmap, realx, realy, color);
+	else if (letter == 'c') DrawBitmap(cl_bitmap, realx, realy, color);
+	else if (letter == 'C') DrawBitmap(cu_bitmap, realx, realy, color);
+	else if (letter == 'd') DrawBitmap(Dl_bitmap, realx, realy, color);
+	else if (letter == 'D') DrawBitmap(Du_bitmap, realx, realy, color);
+	else if (letter == 'e') DrawBitmap(El_bitmap, realx, realy, color);
+	else if (letter == 'E') DrawBitmap(Eu_bitmap, realx, realy, color);
+	else if (letter == 'f') DrawBitmap(Fl_bitmap, realx, realy, color);
+	else if (letter == 'F') DrawBitmap(Fu_bitmap, realx, realy, color);
+	else if (letter == 'g') DrawBitmap(Gl_bitmap, realx, realy, color);
+	else if (letter == 'G') DrawBitmap(Gu_bitmap, realx, realy, color);
+	else if (letter == 'h') DrawBitmap(Hl_bitmap, realx, realy, color);
+	else if (letter == 'H') DrawBitmap(Hu_bitmap, realx, realy, color);
+	else if (letter == 'i') DrawBitmap(Il_bitmap, realx, realy, color);
+	else if (letter == 'I') DrawBitmap(Iu_bitmap, realx, realy, color);
+	else if (letter == 'j') DrawBitmap(Jl_bitmap, realx, realy, color);
+	else if (letter == 'J') DrawBitmap(Ju_bitmap, realx, realy, color);
+	else if (letter == 'k') DrawBitmap(Kl_bitmap, realx, realy, color);
+	else if (letter == 'K') DrawBitmap(Ku_bitmap, realx, realy, color);
+	else if (letter == 'l') DrawBitmap(Ll_bitmap, realx, realy, color);
+	else if (letter == 'L') DrawBitmap(Lu_bitmap, realx, realy, color);
+	else if (letter == 'm') DrawBitmap(Ml_bitmap, realx, realy, color);
+	else if (letter == 'M') DrawBitmap(Mu_bitmap, realx, realy, color);
+	else if (letter == 'n') DrawBitmap(Nl_bitmap, realx, realy, color);
+	else if (letter == 'N') DrawBitmap(Nu_bitmap, realx, realy, color);
+	else if (letter == 'o') DrawBitmap(Ol_bitmap, realx, realy, color);
+	else if (letter == 'O') DrawBitmap(Ou_bitmap, realx, realy, color);
+	else if (letter == 'p') DrawBitmap(Pl_bitmap, realx, realy, color);
+	else if (letter == 'P') DrawBitmap(Pu_bitmap, realx, realy, color);
+	else if (letter == 'q') DrawBitmap(Ql_bitmap, realx, realy, color);
+	else if (letter == 'Q') DrawBitmap(Qu_bitmap, realx, realy, color);
+	else if (letter == 'r') DrawBitmap(Rl_bitmap, realx, realy, color);
+	else if (letter == 'R') DrawBitmap(Ru_bitmap, realx, realy, color);
+	else if (letter == 's') DrawBitmap(Sl_bitmap, realx, realy, color);
+	else if (letter == 'S') DrawBitmap(Su_bitmap, realx, realy, color);
+	else if (letter == 't') DrawBitmap(Tl_bitmap, realx, realy, color);
+	else if (letter == 'T') DrawBitmap(Tu_bitmap, realx, realy, color);
+	else if (letter == 'u') DrawBitmap(Ul_bitmap, realx, realy, color);
+	else if (letter == 'U') DrawBitmap(Uu_bitmap, realx, realy, color);
+	else if (letter == 'v') DrawBitmap(Vl_bitmap, realx, realy, color);
+	else if (letter == 'V') DrawBitmap(Vu_bitmap, realx, realy, color);
+	else if (letter == 'w') DrawBitmap(Wl_bitmap, realx, realy, color);
+	else if (letter == 'W') DrawBitmap(Wu_bitmap, realx, realy, color);
+	else if (letter == 'x') DrawBitmap(Xl_bitmap, realx, realy, color);
+	else if (letter == 'X') DrawBitmap(Xu_bitmap, realx, realy, color);
+	else if (letter == 'y') DrawBitmap(Yl_bitmap, realx, realy, color);
+	else if (letter == 'Y') DrawBitmap(Yu_bitmap, realx, realy, color);
+	else if (letter == 'z') DrawBitmap(Zl_bitmap, realx, realy, color);
+	else if (letter == 'Z') DrawBitmap(Zu_bitmap, realx, realy, color);
+	else if (letter == '[') DrawBitmap(openBracket_bitmap, realx, realy, color);
+	else if (letter == ']') DrawBitmap(closeBracket_bitmap, realx, realy, color);
+	else if (letter == '(') DrawBitmap(openParen_bitmap, realx, realy, color);
+	else if (letter == ')') DrawBitmap(closeParen_bitmap, realx, realy, color);
+	else if (letter == '!') DrawBitmap(exclam_bitmap, realx, realy, color);
+	else if (letter == '"') DrawBitmap(quote_bitmap, realx, realy, color);
+	else if (letter == '#') DrawBitmap(hash_bitmap, realx, realy, color);
+	else if (letter == '$') DrawBitmap(dollar_bitmap, realx, realy, color);
+	else if (letter == '%') DrawBitmap(percent_bitmap, realx, realy, color);
+	else if (letter == '&') DrawBitmap(amp_bitmap, realx, realy, color);
+	else if (letter == '/') DrawBitmap(slash_bitmap, realx, realy, color);
+	else if (letter == '=') DrawBitmap(equal_bitmap, realx, realy, color);
+	else if (letter == ':') DrawBitmap(colon_bitmap, realx, realy, color);
+	else if (letter == '0') DrawBitmap(num0_bitmap, realx, realy, color);
+	else if (letter == '1') DrawBitmap(num1_bitmap, realx, realy, color);
+	else if (letter == '2') DrawBitmap(num2_bitmap, realx, realy, color);
+	else if (letter == '3') DrawBitmap(num3_bitmap, realx, realy, color);
+	else if (letter == '4') DrawBitmap(num4_bitmap, realx, realy, color);
+	else if (letter == '5') DrawBitmap(num5_bitmap, realx, realy, color);
+	else if (letter == '6') DrawBitmap(num6_bitmap, realx, realy, color);
+	else if (letter == '7') DrawBitmap(num7_bitmap, realx, realy, color);
+	else if (letter == '8') DrawBitmap(num8_bitmap, realx, realy, color);
+	else if (letter == '9') DrawBitmap(num9_bitmap, realx, realy, color);
+
+}
 uint8_t ReadRTC(uint8_t reg) 
 { 
 	// mandar 0x70 en el rgistro
@@ -708,18 +1631,20 @@ unsigned char InternalKeyboardReadCharNonBlocking() {
 }
 void InitializeKernel(KernelServices* Services)
 {
+	//putpixel(10, 10, 255);
+
     // opcional: limpia la estructura principal (si vive en stack)
     InternalMemorySet(Services, 0, sizeof(KernelServices));
 
     // reservar subestructuras
-    DisplayServices* Dsp = AllocatePool(sizeof(DisplayServices));
-    MemoryServices* Mem = AllocatePool(sizeof(MemoryServices));
-    IoServices* IO     = AllocatePool(sizeof(IoServices));
-    DiskServices* Dsk  = AllocatePool(sizeof(DiskServices));
-    KernelMiscServices* Msc = AllocatePool(sizeof(KernelMiscServices));
-    TimeServices* Tim = AllocatePool(sizeof(TimeServices));
-    MusicServices* Music = AllocatePool(sizeof(MusicServices));
-	KernelSystemInfo* Info = AllocatePool(sizeof(KernelSystemInfo));
+    DisplayServices* 	Dsp 	= AllocatePool(sizeof(DisplayServices));
+    MemoryServices* 	Mem 	= AllocatePool(sizeof(MemoryServices));
+    IoServices* 		IO     	= AllocatePool(sizeof(IoServices));
+    DiskServices* 		Dsk  	= AllocatePool(sizeof(DiskServices));
+    KernelMiscServices* Msc 	= AllocatePool(sizeof(KernelMiscServices));
+    TimeServices* 		Tim 	= AllocatePool(sizeof(TimeServices));
+    MusicServices* 		Music 	= AllocatePool(sizeof(MusicServices));
+	KernelSystemInfo* 	Info 	= AllocatePool(sizeof(KernelSystemInfo));
 
     // comprobar allocs
     if (!Dsp || !Mem || !IO || !Dsk || !Msc) {
@@ -734,6 +1659,9 @@ void InitializeKernel(KernelServices* Services)
     InternalMemorySet(IO,  0, sizeof(IoServices));
     InternalMemorySet(Dsk, 0, sizeof(DiskServices));
     InternalMemorySet(Msc, 0, sizeof(KernelMiscServices));
+	InternalMemorySet(Tim, 0, sizeof(TimeServices));
+	InternalMemorySet(Music,0, sizeof(MusicServices));
+	InternalMemorySet(Info, 0, sizeof(KernelSystemInfo));
 
     // conectar subestructuras
     Services->Display 		= Dsp;
@@ -763,6 +1691,8 @@ void InitializeKernel(KernelServices* Services)
     Dsp->clearScreen       = &InternalClearScreen;
     Dsp->Set               = &InternalSetActualDisplayService;
     Dsp->setAttrs          = &InternalSetAttriubtes;
+	Dsp->ActivatePixel	   = &InternalGopScreenInit;
+	Dsp->DrawRectangle	   = &InternalDrawPixel;
 
     Dsp->CurrentLine      = 0;
     Dsp->CurrentCharacter = 0;
@@ -801,6 +1731,7 @@ void InitializeKernel(KernelServices* Services)
 	// informacion
 	Info->ModuWorldPtr  = ((uint8_t*)0x0AFB032C);
 	Info->ProgramSizePtr= &ProgramMainSize;
+	Info->VideoMemPtr	= ((uint8_t*)0xb8000);
 
     // hacer global la estructura principal
     GlobalServices = Services;
@@ -1326,6 +2257,15 @@ void InternalSysCommandExecute(KernelServices* Services, char* command, int lena
 		Services->Display->printg(Year);
 		Services->Display->printg("\n");
 	}
+	else if (StrCmp(command, "te") == 0)
+	{
+		
+		Services->Display->ActivatePixel();
+
+		DrawLetter(0,0, 'C', 15);
+		DrawLetter(1,0, 'c', 15);
+		DrawLetter(2,0, 'c', 15);
+	}
 	else if (StrCmp(command, "modupanic") == 0) InternalModuPanic(KernelStatusSuccess);
 	else if (StrCmp(command, "") == 0);
 	else if (StrCmp(command, "memmap") == 0)
@@ -1621,6 +2561,8 @@ void k_main()
 	// inicializar servicios
 	InitializeKernel(&Services);
 
+	Services.Display->ActivatePixel();
+
 	// etapa de arranque silencioso aqui se seleccionan diferentes configuraciones
 	// y otras cosas para poder inicializar los servicios de manera compleja, como
 	// la pantalla
@@ -1799,10 +2741,17 @@ void InternalClearScreen()
 	*row_selected = 0;
 	*line_selected = 0;
 
+	if (InternalGrapichalFlag)
+	{
+		draw_bg(0);
+		return;
+	}
+	
 	// la memoria de video
 	char *vidmem = (char *) 0xb8000; unsigned int i=0;
 	// limpia la pantalla
 	while(i < (80*25*2)) { vidmem[i]=' '; i++; vidmem[i]=*text_attr; i++; };
+	
 };
 void InternalPrintg(char *message, unsigned int line)
 {
@@ -1833,37 +2782,76 @@ void InternalCursorPos(int x, int y) {
 }
 void InternalPrintgNonLine(char *message)
 {
-    char *vidmem = (char *)0xb8000;
-    int line = *line_selected;
-    int column = (*row_selected) / 2; // convertir a columna
+	if (InternalGrapichalFlag)
+	{
+		int letter = 0;
+		int line = *line_selected;
+		int column = (*row_selected) / 2;
 
-    while (*message != 0)
-    {
-        if (*message == '\n' || column >= 80)
-        {
-            line++;
-            column = 0;
-            message++;
+		while (message[letter])
+		{
+			if (line >= 25) {
+				char* vidmem = (char *)0xA0000;
+				InternalMemMove(vidmem, vidmem + (320 * 2), 320*200);
+				line = 24;
+			}
+			if (message[letter] == '\n')
+			{
+				line++;
+				column = 0;
+			}
+			else	
+			{
+				DrawLetter(column,line, message[letter], *text_attr);
+				column++;
+			}
 
-            if (line >= 25) {
-                InternalMemMove(vidmem, vidmem + 80*2, 24*80*2);
-                for (int j = 0; j < 80; j++) {
-                    vidmem[(24*80 + j)*2] = ' ';
-                    vidmem[(24*80 + j)*2 + 1] = *text_attr;
-                }
-                line = 24;
-            }
-        }
-        else
-        {
-            int pos = (line * 80 + column) * 2;
-            vidmem[pos] = *message;
-            vidmem[pos+1] = *text_attr;
-            message++;
-            column++;
-        }
-    }
+			if (column >= 16)
+			{
+				line++;
+				column = 0;
+			}
 
-    *line_selected = line;
-    *row_selected = column * 2; // mantener compatibilidad
+			letter++;
+		}
+
+		*line_selected = line;
+		*row_selected = column * 2;
+	}
+	else
+	{
+		char *vidmem = (char *)0xb8000;
+		int line = *line_selected;
+		int column = (*row_selected) / 2; // convertir a columna
+
+		while (*message != 0)
+		{
+			if (*message == '\n' || column >= 80)
+			{
+				line++;
+				column = 0;
+				message++;
+
+				if (line >= 25) {
+					InternalMemMove(vidmem, vidmem + 80*2, 24*80*2);
+					for (int j = 0; j < 80; j++) {
+						vidmem[(24*80 + j)*2] = ' ';
+						vidmem[(24*80 + j)*2 + 1] = *text_attr;
+					}
+					line = 24;
+				}
+			}
+			else
+			{
+				int pos = (line * 80 + column) * 2;
+				vidmem[pos] = *message;
+				vidmem[pos+1] = *text_attr;
+				message++;
+				column++;
+			}
+		}
+
+		*line_selected = line;
+		*row_selected = column * 2; // mantener compatibilidad
+	}
 }
