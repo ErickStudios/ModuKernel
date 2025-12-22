@@ -2561,8 +2561,6 @@ void k_main()
 	// inicializar servicios
 	InitializeKernel(&Services);
 
-	Services.Display->ActivatePixel();
-
 	// etapa de arranque silencioso aqui se seleccionan diferentes configuraciones
 	// y otras cosas para poder inicializar los servicios de manera compleja, como
 	// la pantalla
