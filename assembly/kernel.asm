@@ -321,7 +321,7 @@ InternalDrawPixel:
     mov esi, eax
     mov eax, [esp+12 + 16]    ; y
     mov edi, eax
-    mov eax, 1    ; size [esp+16 + 16]
+    mov eax, [esp+16 + 16]    ; size
     mov ecx, eax
 
     ; calcular offset = y*320 + x
