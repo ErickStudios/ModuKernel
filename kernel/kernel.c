@@ -68,7 +68,6 @@ void DrawBitmap(const uint8_t* BitMap, int x, int y, uint8_t color) {
         }
     }
 }
-
 void DrawLetter(int x, int y, char letter, uint8_t color)
 {
 
@@ -1697,6 +1696,7 @@ void InitializeKernel(KernelServices* Services)
     Dsp->CurrentLine      = 0;
     Dsp->CurrentCharacter = 0;
     Dsp->CurrentAttrs     = 0;
+	Dsp->IsInPixelsMode   = &InternalGrapichalFlag;
 
     // IO
     IO->Input   = &inb;
@@ -2049,14 +2049,14 @@ void InternalSysCommandExecute(KernelServices* Services, char* command, int lena
 
 							putedDirs[indexPutDirs++] = temp;
 							Services->Display->printg(temp);
-							Services->Display->printg("/    ");
+							Services->Display->printg((*Services->Display->IsInPixelsMode) ? "/" : "/    ");
 							Recorrer++;
 						} else {
 							GlobalServices->Memory->FreePool(temp); // no lo guardes si ya estaba
 						}
 					} else {
 						Services->Display->printg(rtm);
-						Services->Display->printg("    ");
+						Services->Display->printg((*Services->Display->IsInPixelsMode) ? "" : "    ");
 						Recorrer++;
 					}
 
@@ -2064,6 +2064,10 @@ void InternalSysCommandExecute(KernelServices* Services, char* command, int lena
 					{
 						Recorrer = 0;
 						Services->Display->printg("\n");
+					}
+					else
+					{
+						if (*Services->Display->IsInPixelsMode) Services->Display->printg("\n");
 					}
 
 				}

@@ -72,5 +72,8 @@ typedef struct _DisplayServices {
     en pixeles, no hay tamaño x ni tamaño y ya que esto utiliza la cantidad
     de pixeles del cuarto parametro para eso*/
     KernelSimpleDisplayDrawRectangle DrawRectangle;
+    /* puntero a la flag que indica si esta en modo grafico o en modo texto
+    , 1 si esta en grafico, y 0 si esta en modo texto */
+    uint8_t* IsInPixelsMode;
 } DisplayServices;
 #endif
