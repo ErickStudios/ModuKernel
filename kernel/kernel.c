@@ -39,7 +39,7 @@ uint8_t Colorea = 20;
 
 extern void config_mode();
 extern void unconfig_mode();
-extern void draw_bg(uint8_t Color);
+extern void InternalDrawBackground(uint8_t Color);
 void InternalDrawPixel(uint8_t color, int x, int y, int size);
 extern void InternalGopScreenInit();
 extern void InternalSendCharToSerial(char ch);
@@ -61,7 +61,7 @@ void DrawBitmap(const uint8_t* BitMap, int x, int y, uint8_t color) {
         }
     }
 }
-void DrawLetter(int x, int y, char letter, uint8_t color)
+void DrawLetterOffset(int x, int y, char letter, uint8_t color, int ofX, int OfY)
 {
 
 	unsigned char au_bitmap[7] = {
@@ -870,8 +870,19 @@ unsigned char num0_bitmap[7] = {
 
 };
 
-	int realx = (x * 5);
-	int realy = (y * 8);
+unsigned char lleno_bitmap[7] = {
+    0b111111, //
+	0b111111,
+	0b111111,
+	0b111111,
+	0b111111,
+	0b111111,
+	0b111111,
+
+};
+
+	int realx = (x * 5) + ofX;
+	int realy = (y * 8) + OfY;
 
 	if (letter == 'a') DrawBitmap(al_bitmap, realx, realy, color);
 	else if (letter == 'A') DrawBitmap(au_bitmap, realx, realy, color);
@@ -948,7 +959,24 @@ unsigned char num0_bitmap[7] = {
 	else if (letter == '7') DrawBitmap(num7_bitmap, realx, realy, color);
 	else if (letter == '8') DrawBitmap(num8_bitmap, realx, realy, color);
 	else if (letter == '9') DrawBitmap(num9_bitmap, realx, realy, color);
+	else if (letter == '\a') {
+		DrawBitmap(lleno_bitmap, realx, realy - 1, color);
+		DrawBitmap(lleno_bitmap, realx + 1, realy - 1, color);
+		DrawBitmap(lleno_bitmap, realx, realy, color);
+		DrawBitmap(lleno_bitmap, realx + 1, realy, color);
+	}
+}
+void DrawLetter(int x, int y, char letter, uint8_t color)
+{
+	DrawLetterOffset(x, y, letter, color, 0, 0);
+}
+uint8_t InternalPixelGetColorOf(int x, int y)
+{
+	if (!InternalGrapichalFlag) return 0;
 
+	uint8_t* VidMem = (uint8_t *)0xA0000;
+
+	return VidMem[(y * 80) + x];
 }
 uint8_t ReadRTC(uint8_t reg) 
 { 
@@ -1685,6 +1713,9 @@ void InitializeKernel(KernelServices* Services)
     Dsp->setAttrs          = &InternalSetAttriubtes;
 	Dsp->ActivatePixel	   = &InternalGopScreenInit;
 	Dsp->DrawRectangle	   = &InternalDrawPixel;
+	Dsp->DrawBackgroundColor=&InternalDrawBackground;
+	Dsp->DrawLetter 	   = &DrawLetterOffset;
+	Dsp->GetPixel		   = &InternalPixelGetColorOf;
 
     Dsp->CurrentLine      = 0;
     Dsp->CurrentCharacter = 0;
@@ -2258,6 +2289,7 @@ void InternalSysCommandExecute(KernelServices* Services, char* command, int lena
 		
 		Services->Display->ActivatePixel();
 
+		Services->Display->setAttrs(2, 7);
 		DrawLetter(0,0, 'C', 15);
 		DrawLetter(1,0, 'c', 15);
 		DrawLetter(2,0, 'c', 15);
@@ -2451,11 +2483,19 @@ void InternalSysCommandExecute(KernelServices* Services, char* command, int lena
 		if (StrnCmp(Sizea, "/mw ", 4) == 0) InternalDumpHexMemory(Services->Info->ModuWorldPtr, (size_t)HexStringToInt(Sizea + 4));
 		else InternalDumpHexMemory(heap_start, (size_t)HexStringToInt(Sizea));
 	}
+	else if (StrCmp(command, "shift") == 0)
+	{
+		char* vidmem = (char *)0xA0000;
+		InternalMemMove(vidmem, vidmem + 1, 320*200);
+	}
 	else if (StrCmp(command, "logoff") == 0)
 	{
 		Services->Display->printg("login off, yo can press ENTER to wake up the system\n");
 		Services->Memory->RepairMemory(Services);
 	}
+	else if (StrCmp(command, "ugrm") == 0) unconfig_mode();
+	else if (StrCmp(command, "grm") == 0) config_mode();
+	else if (StrCmp(command, "shell") == 0) InternalMiniKernelProgram(Services);
 	else {
 		char* Params[128];
 		int ParamsCount = StrSplit(command, Params, ' ');
@@ -2601,6 +2641,8 @@ void k_main()
 	// aunque aqui se hace una animacion para que no se vea muy cutre, recuerden, pueden
 	// personalizarla si se basan en el kernel
 
+	char interrupted = 0;
+
 	// zona
 	int IndexZone = 0;
 	// logo
@@ -2615,7 +2657,11 @@ void k_main()
 	{
 		char Key = Services.InputOutput->ReadKey();
 
-		if (Key == 'c' || Key == 'C') break;
+		if (Key == 'c' || Key == 'C') 
+		{
+			interrupted = 1;
+			break;
+		}
 
 		// setear linea actual
 
@@ -2654,6 +2700,19 @@ void k_main()
 	MemoryCurrentSystem = MemAllocTypeSystem;
 
 	Services.Display->printg("\n\n");
+	if (interrupted == 1);
+	else
+	{
+		FatFile DesktopFile = Services.File->OpenFile("/bin/desktop");
+
+		void* content; int size;
+		KernelStatus Status = Services.File->GetFile(DesktopFile, &content, &size);
+
+		if (!_StatusError(Status)) Services.Misc->RunBinary(content, size, &Services);
+
+		Services.Memory->FreePool(content);
+	}
+
 	InternalMiniKernelProgram(&Services);
 }
 KernelStatus ProcessCrtByFile(char* name, char* ext, KernelServices* Services)
@@ -2665,12 +2724,7 @@ KernelStatus ProcessCrtByFile(char* name, char* ext, KernelServices* Services)
 	int size;
 
 	if (InternalDiskGetFile(file, &data, &size) == 0) {
-		// convertir el puntero a función
-		typedef int (*ProgramEntry)(KernelServices* Services);
-		ProgramEntry entry = (ProgramEntry) data;
-
-		// ejecutar el programa pasando los servicios del kernel
-		int result = entry(Services);
+		InternalRunBinary(data, size, Services);
 	}
 }
 void* InternalAllocatePool(unsigned int size, ModuAllocType Type) 
@@ -2742,7 +2796,9 @@ void InternalClearScreen()
 
 	if (InternalGrapichalFlag)
 	{
-		draw_bg(0);
+		InternalDrawBackground(
+			(*text_attr >> 4) & 0x07
+		);
 		return;
 	}
 	
@@ -2789,6 +2845,8 @@ void InternalPrintgNonLine(char *message)
 
 		while (message[letter])
 		{
+			InternalSendCharToSerial(message[letter]);
+
 			if (line >= 25) {
 				char* vidmem = (char *)0xA0000;
 				InternalMemMove(vidmem, vidmem + (320 * 2), 320*200);
@@ -2801,7 +2859,8 @@ void InternalPrintgNonLine(char *message)
 			}
 			else	
 			{
-				DrawLetter(column,line, message[letter], *text_attr);
+				DrawLetter(column,line, '\a', (*text_attr >> 4) & 0x07);
+				DrawLetter(column,line, message[letter], *text_attr % 0x10);
 				column++;
 			}
 
@@ -2825,6 +2884,8 @@ void InternalPrintgNonLine(char *message)
 
 		while (*message != 0)
 		{
+			InternalSendCharToSerial(message[0]);
+
 			if (*message == '\n' || column >= 80)
 			{
 				line++;

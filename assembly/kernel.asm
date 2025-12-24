@@ -8,33 +8,43 @@ bits 32
 
 ; multiboot
 section .multiboot
-	align 4
-	dd 0x1BADB002			;magic
-	dd 0x0				;flags
-	dd - (0x1BADB002 + 0x00)	;checksum. m+f+c should be zero
+	; header multiboot
+	align 4						; alineacion para multiboot
+	dd 0x1BADB002				; codigo magico para indicar que es multiboot
+	dd 0x0						; parametros de cargador de arranque
+	dd - (0x1BADB002 + 0x00)	; checksum. m+f+c debe ser 0
 
 ; seccion de datos
 section .data
 	; mensaje auxilear de que ha fallado
 	msg db 10,'El kernel ha fallado y se ha regresado al entorno pre-C, reinicie la pc para continuar',10,0
-	InternalGrapichalFlag db 0
+	
+	; datos de grafico
+	InternalGrapichalFlag db 0	; bandera grafica
 
 ; seccion de texto y datos
 section .text
 
-; globalizar start
-global start
-global config_mode
-global unconfig_mode
-global draw_bg
-global InternalDrawPixel
-global init_serial
-global InternalSendCharToSerial
-global InternalGrapichalFlag
+; funciones de assembly estandart
+global start					; funcion de inicio
+
+; funciones de configuracion y desconfiguracion de modos
+global config_mode				; funcion que configura el modo grafico
+global unconfig_mode			; funcion que sale del modo grafico pero no funciona, solo para buggearlo y terminar de configurarlo
+
+; funciones del display y display avanzado
+global InternalDrawBackground	; funcion para dibujar un fondo de un color
+global InternalDrawPixel		; funcion para dibujar un pixel o varios
+global InternalGopScreenInit	; funcion para inicializar la pantalla en modo grafico
+global InternalGrapichalFlag	; bandera de graficos si esta en modo grafico
+
+; funciones de la consola serial
+global init_serial				; inicializa la consola serial
+global InternalSendCharToSerial	; funcion para enviar caracteres a la consola serial
 
 ; funciones
-extern InternalPrintgNonLine		; funcion de impresion
-extern k_main						; funcion principal
+extern InternalPrintgNonLine	; funcion de impresion
+extern k_main					; funcion principal
 
 ; principal
 start:
@@ -42,118 +52,141 @@ start:
 	; etapa pre-prematura, aqui se configura todo y las tareas de bajo nivel
 	; que no se pueden hacer en C se hacen
 
-	; desactivar interrupciones
-    cli
+	; funciones de estandart
+    cli							; desactivar interrupciones
 
-	; iniciar serial
-	call init_serial
-
-	; preparar al kernel para la etapa post-prematura y el arranque C prematuro
-    call k_main
+	; funciones de kernel y inicializar
+	call init_serial			; iniciar serial
+    call k_main					; preparar al kernel para la etapa post-prematura y el arranque C prematuro
 
 	; aqui si algo salio mal en el arranque aqui se hara un codigo de emergencia
 	; que limpiara la pila y congelara el kernel
 
-	; el mensaje
-    push msg
-	; mandar a imprimir
-	call InternalPrintgNonLine
-	; no hay nada
-    add esp, 4
+	; detencion personalizada
+    push msg					; el mensaje
+	call InternalPrintgNonLine	; mandar a imprimir
+    add esp, 4					; no hay nada
 
-	; si algo sale mal congelar
-	hlt
+	; detencion estandart
+	hlt							; si algo sale mal congelar
+	ret							; por que pasara esto, bueno esta por si acaso
 
-global InternalDrawPixel
-global InternalGopScreenInit
-
+; configura el modo grafico, esto no funciona por si solo, se necesita
+; salir entrar salir entrar y mas secuncias raras que parece que todo
+; se hace para entrar y salir repetidamente
 config_mode:
-	; --- Misc Output (elige reloj y segmento A0000) ---
-	mov dx, 0x3C2
-	mov al, 0x63            ; 28MHz, habilitar RAM, segmento A0000
-	out dx, al
+	; 28MHz habilita RAM, segmento de pantalla A0000
+	mov dx, 0x3C2				; puerto
+	mov al, 0x63				; dato
+	out dx, al					; mandarlo
 
-	; --- Sequencer ---
-	mov dx, 0x3C4
-	mov al, 0x00            ; Reset
-	out dx, al
-	mov dx, 0x3C5
-	mov al, 0x03            ; terminar reset
-	out dx, al
+	; macro para repeticion de vga secuencer
+	%macro CfgVgaSecu 2
+		; configurar registro 1
+		mov dx, 0x3C4 			; puerto
+		mov al, %1 				; dato
+		out dx, al 				; enviarlo
 
-	mov dx, 0x3C4
-	mov al, 0x01            ; Clocking Mode
-	out dx, al
-	mov dx, 0x3C5
-	mov al, 0x01
-	out dx, al
+		; configurar registro 2
+		mov dx, 0x3C5			; puerto
+		mov al, %2           	; dato
+		out dx, al 				; enviarlo
+	%endmacro
 
-	mov dx, 0x3C4
-	mov al, 0x02            ; Map Mask
-	out dx, al
-	mov dx, 0x3C5
-	mov al, 0x0F
-	out dx, al
+	; configurar el vga secuencer y hacer la secuencia
+	; para configurar el modo grafico
+	CfgVgaSecu 0x00, 0x03		; restablezer para estar listo
 
-	mov dx, 0x3C4
-	mov al, 0x03            ; Character Map Select
-	out dx, al
-	mov dx, 0x3C5
-	mov al, 0x00
-	out dx, al
+	CfgVgaSecu 0x01, 0x01		; clocking mode
+	CfgVgaSecu 0x02, 0x0F		; map mask
 
-	mov dx, 0x3C4
-	mov al, 0x04            ; Memory Mode
-	out dx, al
-	mov dx, 0x3C5
-	mov al, 0x06            ; chain-4
-	out dx, al
+	CfgVgaSecu 0x03, 0x00		; character map select
+	CfgVgaSecu 0x04, 0x06		; seleccionar MemoryMode y activar chain-4
 
-	; --- CRTC (desbloquear 0x11) ---
-	mov dx, 0x3D4
-	mov al, 0x11
-	out dx, al
-	mov dx, 0x3D5
-	in  al, dx
-	and al, 0x7F
-	out dx, al
+	; configurar CRTC para desbloquear 0x11 y hacer
+	; modo grafico
+
+	; configurar registro 1
+	mov dx, 0x3D4				; puerto
+	mov al, 0x11				; dato
+	out dx, al					; mandarlo
+
+	; leer registro 2
+	mov dx, 0x3D5				; puerto
+	in  al, dx					; leerlo
+
+	; hacer operaciones
+	and al, 0x7F				; operar con and
+	out dx, al					; mandarlo
 
 	; --- CRTC timings modo 13h ---
 	; idx in 0x3D4, data in 0x3D5
-	%macro set_crtc 2
-		mov dx, 0x3D4
-		mov al, %1
-		out dx, al
-		mov dx, 0x3D5
-		mov al, %2
-		out dx, al
+	%macro AjustarCrtc 2
+		; configurar registro 1
+		mov dx, 0x3D4 			; puerto
+		mov al, %1				; dato
+		out dx, al				; enviarlo
+
+		; configurar registro 2
+		mov dx, 0x3D5			; puerto
+		mov al, %2				; dato
+		out dx, al				; enviarlo
 	%endmacro
 
-	set_crtc 0x00, 0x5F
-	set_crtc 0x01, 0x4F
-	set_crtc 0x02, 0x50
-	set_crtc 0x03, 0x82
-	set_crtc 0x04, 0x54
-	set_crtc 0x05, 0x80
-	set_crtc 0x06, 0xBF
-	set_crtc 0x07, 0x1F
-	set_crtc 0x08, 0x00
-	set_crtc 0x09, 0x41
-	set_crtc 0x0A, 0x00
-	set_crtc 0x0B, 0x00
-	set_crtc 0x0C, 0x00
-	set_crtc 0x0D, 0x00
-	set_crtc 0x0E, 0x00
-	set_crtc 0x0F, 0x00
-	set_crtc 0x10, 0x9C
-	set_crtc 0x11, 0x8E
-	set_crtc 0x12, 0x8F
-	set_crtc 0x13, 0x28     ; bytes por línea / 2 → 0x28 → 320 bytes por línea
-	set_crtc 0x14, 0x40
-	set_crtc 0x15, 0x96
-	set_crtc 0x16, 0xB9
-	set_crtc 0x17, 0xA3
-	set_crtc 0x18, 0xFF
+	; ajustar el Crtc para mas secuencia de comandos
+	; al 3D4h y 3D5h
+
+	; display horizontal
+
+	AjustarCrtc 0x00, 0x5F		; total de horizontal
+	AjustarCrtc 0x01, 0x4F		; fin del display horizontal
+
+	; blanco horizontal
+
+	AjustarCrtc 0x02, 0x50		; inicio del blanco horizontal
+	AjustarCrtc 0x03, 0x82		; fin del blanco horizontal
+
+	; retrazo horizontal
+
+	AjustarCrtc 0x04, 0x54		; inicio del retrazo de horizontal
+	AjustarCrtc 0x05, 0x80		; fin del retrazo de horizontal
+
+	; donde se configura la parte vertical de la pantalla
+
+	AjustarCrtc 0x06, 0xBF		; total del vertical
+
+	; overflow
+	AjustarCrtc 0x07, 0x1F
+	AjustarCrtc 0x08, 0x00
+	AjustarCrtc 0x09, 0x41
+	AjustarCrtc 0x0A, 0x00
+	AjustarCrtc 0x0B, 0x00
+	AjustarCrtc 0x0C, 0x00
+	AjustarCrtc 0x0D, 0x00
+	AjustarCrtc 0x0E, 0x00
+	AjustarCrtc 0x0F, 0x00
+
+	; retrazo vertical
+	AjustarCrtc 0x10, 0x9C		; inicio del retrazo vertical
+	AjustarCrtc 0x11, 0x8E		; fin del retrazo vertical
+	AjustarCrtc 0x12, 0x8F		; fin del display vertical
+
+	; offset
+	AjustarCrtc 0x13, 0x28
+
+	; ubicacion de underline
+	AjustarCrtc 0x14, 0x40
+
+	; blanco vertical
+
+	AjustarCrtc 0x15, 0x96		; inicio del blanco vertical
+	AjustarCrtc 0x16, 0xB9		; fin del blanco vertical
+
+	; control del modo del CRTC
+	AjustarCrtc 0x17, 0xA3
+
+	; comparador de linea
+	AjustarCrtc 0x18, 0xFF
 
 	; --- Graphics Controller ---
 	%macro set_gc 2
@@ -165,6 +198,7 @@ config_mode:
 		out dx, al
 	%endmacro
 
+	; secuencia 2
 	set_gc 0x00, 0x00       ; Set/Reset
 	set_gc 0x01, 0x00       ; Enable Set/Reset
 	set_gc 0x02, 0x00       ; Color Compare
@@ -187,62 +221,66 @@ config_mode:
 		out dx, al
 	%endmacro
 
+	; secuencia 3
 	set_ac 0x10, 0x41       ; Mode Control (gráfico, blink off)
 	set_ac 0x12, 0x0F       ; Color Plane Enable (todas)
 	set_ac 0x13, 0x00       ; Horizontal PEL Panning
 	set_ac 0x14, 0x00       ; Color Select
 
 	; Unblank: habilita salida de video
-	mov dx, 0x3DA
-	in  al, dx
-	mov dx, 0x3C0
-	mov al, 0x20
-	out dx, al
+
+	; obtener unblank
+	mov dx, 0x3DA			; puerto
+	in  al, dx				; recibir
+
+	; configurar registro
+	mov dx, 0x3C0			; puerto
+	mov al, 0x20			; dato
+	out dx, al				; mandar
 
 	ret
 
+; desconfiguar el modo grafico y vuelve al modo texto, bueno, se
+; supone que debe hacer eso pero esta tan buggeado que solo sierve
+; para ayudar con mas bugs a que el modo grafico funcione
 unconfig_mode:
+	mov byte [InternalGrapichalFlag], 0x00
+
 	; --- Misc Output ---
-	mov dx, 0x3C2
-	mov al, 0x67        ; reloj 25 MHz, habilitar RAM, segmento B8000
-	out dx, al
+	mov dx, 0x3C2			; puerto
+	mov al, 0x67        	; dato: reloj 25 MHz, habilitar RAM, segmento B8000
+	out dx, al				; mandar
+
+	%macro SetSeq2 2
+		; configurar registro 1
+		mov dx, 0x3C4		; puerto
+		mov al, %1			; dato
+		out dx, al			; mandar
+
+		; configurar registro 2
+		mov dx, 0x3C5		; puerto
+		mov al, %2			; dato
+		out dx, al			; mandar
+	%endmacro
 
 	; --- Sequencer ---
-	mov dx, 0x3C4
-	mov al, 0x00
-	out dx, al
-	mov dx, 0x3C5
-	mov al, 0x03
-	out dx, al
+	SetSeq2 0x00, 0x03		; mandar 0x00 y 0x03
+	SetSeq2 0x01, 0x00		; clocking mode texto
+	SetSeq2 0x02, 0x03		; planes 0 y 1
+	SetSeq2 0x04, 0x02		; modo texto
 
-	mov dx, 0x3C4
-	mov al, 0x01
-	out dx, al
-	mov dx, 0x3C5
-	mov al, 0x00        ; clocking mode texto
-	out dx, al
+	; configurar el Grapichs controller para poder inicializar el
+	; modo texto
 
-	mov dx, 0x3C4
-	mov al, 0x02
-	out dx, al
-	mov dx, 0x3C5
-	mov al, 0x03        ; planes 0 y 1
-	out dx, al
+	; configurar registro 1
+	mov dx, 0x3CE			; puerto
+	mov al, 0x06			; dato
+	out dx, al				; mandar
 
-	mov dx, 0x3C4
-	mov al, 0x04
-	out dx, al
-	mov dx, 0x3C5
-	mov al, 0x02        ; modo texto
-	out dx, al
-
-	; --- Graphics Controller ---
-	mov dx, 0x3CE
-	mov al, 0x06
-	out dx, al
-	mov dx, 0x3CF
-	mov al, 0x0A        ; memoria B8000, modo texto
-	out dx, al
+	; configurar registro 2
+	mov dx, 0x3CF			; puerto
+	mov al, 0x0A        	; dato: memoria B8000, modo texto
+	out dx, al				; mandar
 
 	; --- Attribute Controller ---
 	mov dx, 0x3DA
@@ -262,129 +300,168 @@ unconfig_mode:
 
 	ret
 
+; Inicializa la pantalla con bugs con las funciones de inicializacion por
+; que no se puede con una y para despertar el display completamente
+;
+; esta secuencia se probo primero con comandos y se implemento la secuencia interna
+; despues
 InternalGopScreenInit:
-	mov byte [InternalGrapichalFlag], 0x01
+	; configuracion
+	call config_mode		; modo de configuracion
+	call screen_draw_init	; dibujar negro para inicializar
 
-	call config_mode
-	call screen_draw_init
-	call unconfig_mode
-	call config_mode
-	call screen_draw_init
-	call config_mode
+	; recargarlo
+	call unconfig_mode		; desconfigurar modo
+	call config_mode		; configurarlo
+
+	; dibujar el fondo negro
+	call screen_draw_init	; dibujar fondo negro
+	call config_mode		; configurar para dibujar por fin
+
+	; activar bandera de flag
+	mov byte [InternalGrapichalFlag], 0x01
 
 	; retornar
 	ret
 
+; funcion para dibujar fondo de inicializacion, que este
+; hace que la pantalla se inicialize con negro para no dejarlo
+; raro
 screen_draw_init:
-    ; llenar pantalla con rojo (color 4)
-    mov edi, 0x000A0000
-    mov ecx, 320*200
-    mov eax, [esp+4]   ; primer argumento (uint8_t promovido a int)
-    mov al, 0         ; AL contiene el color
-    rep stosb
+	; dibujar pantalla negra
+    mov edi, 0x000A0000		; el display
+    mov ecx, 320*200		; tamaño de la pantalla
+    mov al, 0				; el color negro
+    rep stosb				; repetirlo
 
-    ; dibujar un píxel blanco en (10,10)
-    mov eax, 10             ; x
-    mov ebx, 10             ; y
-    mov edx, 320
-    imul ebx, edx           ; y*320
-    add ebx, eax
-    mov edi, 0x000A0000
-    add edi, ebx
-    mov byte [edi], 15
+	; mover valores 10 al registro
+    mov eax, 10
+    mov ebx, 10
+
+	; operaciones para hacer x
+    mov edx, 320			; mover el tamaño en x de la pantalla
+    imul ebx, edx			; multiplicarlo
+    add ebx, eax			; sumarle
+
+	; añadir la direccion de la pantalla y sumarle
+    mov edi, 0x000A0000		; direccion
+    add edi, ebx			; dato
+
+	; mover el byte edi a 15
+    mov byte [edi], 15		; mover
     ret
 
-draw_bg:
-    ; obtener argumento Color desde la pila
-    mov eax, [esp+4]   ; primer argumento
-    mov al, al         ; AL = color
+; dibujar un fondo de un color especifico para la pantalla
+InternalDrawBackground:
 
-    ; llenar pantalla con ese color
-    mov edi, 0xA0000
-    mov ecx, 320*200
-    rep stosb
+	; guardar registros para no perderlos y luego poder 
+	; restaurarlos
+
+	; parametros
+    mov eax, [esp+4]		; el color
+    mov al, al				; mover al a al
+
+	; dibujar
+    mov edi, 0xA0000		; la direccion de la pantalla
+    mov ecx, 320*200		; el tamaño del dibujado
+    rep stosb				; repetirlo
 
     ret
 
+; dibujar un pixel a la pantalla grafica, tiene algunos bugs
+; raros de que aunque sea 1 el tamaño da 8 pixeles pero buenp
 InternalDrawPixel:
 
-    ; salvar registros callee-saved
-    push ebx
-    push esi
-    push edi
-    push ebp
+	; guardar registros para no perderlos y luego poder 
+	; restaurarlos
 
-    ; argumentos: color, x, y, size
-    mov eax, [esp+4 + 16]     ; color (ajustado por 4 pushes = 16 bytes)
-    mov bl, al
-    mov eax, [esp+8 + 16]     ; x
-    mov esi, eax
-    mov eax, [esp+12 + 16]    ; y
-    mov edi, eax
-    mov eax, [esp+16 + 16]    ; size
-    mov ecx, eax
+    push ebx				; ebx
+    push esi				; esi
+    push edi				; edi
+    push ebp				; ebp
 
-    ; calcular offset = y*320 + x
-    mov eax, edi        ; y
-    imul eax, 80       ; cada línea = 320 bytes
-    add eax, esi        ; + x
-    add eax, 0xA0000    ; base de video
-    mov edi, eax
-    mov al, bl
-    rep stosb
+	; el color del pixel
+    mov eax, [esp+4 + 16]	; obtener parametro
+    mov bl, al				; moverlo
 
-    ; restaurar registros
-    pop ebp
-    pop edi
-    pop esi
-    pop ebx
+	; la posicion en x
+    mov eax, [esp+8 + 16]	; obtener parametro
+    mov esi, eax			; moverlo
+
+	; la posicion en y
+    mov eax, [esp+12 + 16]	; obtener parametro
+    mov edi, eax			; moverlo
+	
+	; el tamaño
+    mov eax, [esp+16 + 16]	; obtener parametro
+    mov ecx, eax			; moverlo
+
+	; loop de repeticion
+    mov eax, edi			; posicion y
+    imul eax, 80			; multiplicarle las lineas
+    add eax, esi			; sumarle la x
+    add eax, 0xA0000    	; base de video
+    mov edi, eax			; mover eax a edi
+    mov al, bl				; moverlo a al
+    rep stosb				; repetir
+
+	; restaurar los registros para no perderlos
+    pop ebp					; ebp
+    pop edi					; direccion
+    pop esi					; esi
+    pop ebx					; ebx
+
     ret
 
+; funcion para inicializar el COM1 de la consola serial
+; para poder mandar cosas alli
 init_serial:
-	; Inicializar COM1
-	mov dx, 0x3F8+1      ; Interrupt Enable Register
-	mov al, 0x00
-	out dx, al
+	%macro ComSerialSet 2
+		mov dx, 0x3F8+%1
+		mov al, %2
+		out dx, al
+	%endmacro
 
-	mov dx, 0x3F8+3      ; Line Control Register
-	mov al, 0x80         ; habilitar acceso a divisor
-	out dx, al
+	; configurar
+	ComSerialSet 1, 0x00	; Interrupt Enable Register
+	ComSerialSet 3, 0x80	; Line Control Register y habilitar acceso a divisor
+	ComSerialSet 0, 0x01	; Divisor Low (115200 baud)
+	ComSerialSet 1, 0x00	; Divisor High
+	ComSerialSet 3, 0x03	; Line Control Register y 8 bits, sin paridad, 1 stop
+	ComSerialSet 2, 0xC7	; FIFO Control y habilitar FIFO
+	ComSerialSet 4, 0x0B	; Modem Control y RTS/DSR
 
-	mov dx, 0x3F8+0      ; Divisor Low (115200 baud)
-	mov al, 0x01
-	out dx, al
-
-	mov dx, 0x3F8+1      ; Divisor High
-	mov al, 0x00
-	out dx, al
-
-	mov dx, 0x3F8+3      ; Line Control Register
-	mov al, 0x03         ; 8 bits, sin paridad, 1 stop
-	out dx, al
-
-	mov dx, 0x3F8+2      ; FIFO Control
-	mov al, 0xC7         ; habilitar FIFO
-	out dx, al
-
-	mov dx, 0x3F8+4      ; Modem Control
-	mov al, 0x0B         ; RTS/DSR
-	out dx, al
 	ret
 
+; enviar un caracter al puerto serial
 InternalSendCharToSerial:
+	; guardarlo para despues recuperarlo
+	push eax				; el argumento
+	push dx					; el registro
+
     ; obtener argumento desde la pila
-    mov eax, [esp+4]   ; primer argumento
-    ; AL = carácter a enviar
+    mov eax, [esp+4]   		; primer argumento
+
+	; guardar al
+	movzx eax, al			; extension
+	push eax				; guardar
 
     ; espera a que el transmisor esté listo
-    mov dx, 0x3F8+5    ; Line Status Register
-.waita:
-    in al, dx
-    test al, 0x20
-    jz .waita
+    mov dx, 0x3F8+5   	 	; Line Status Register
+
+	; si esta listo?
+	.waita:
+    	in al, dx			; leerlo
+    	test al, 0x20		; probarlo
+    	jz .waita			; si no no se puede
 
     ; enviar carácter
-    mov dx, 0x3F8
-    out dx, al
+    mov dx, 0x3F8			; registro de serial
+	pop eax        			; recupera 32 bits
+	mov al, al     			; ya está en la parte baja de eax
+    out dx, al				; mandarlo
+
+	pop dx					; el registro
+	pop eax					; el argumento
 
     ret

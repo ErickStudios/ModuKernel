@@ -19,6 +19,12 @@ typedef void (*KernelSimpleDisplaySetAsDefault)(struct _DisplayServices* this);
 typedef void (*KernelSimpleDisplayInitGopScreen)();
 /* el tipo para imprimir pixeles */
 typedef void (*KernelSimpleDisplayDrawRectangle)(uint8_t color, int x, int y, int size);
+/* el tipo para dibujar un fondo de un color */
+typedef void (*KernelSimpleDrawBackground)(uint8_t);
+/* el tipo para dibujar una letra */
+typedef void (*KernelAdvancedDisplayDrawLetter)(int x, int y, char letter, uint8_t color, int ofX, int Of);
+/* el tipo para obtener el color en una zona especifica */
+typedef uint8_t (*KernelAdvancedDisplayGetColor)(int x, int y);
 /* el tipo de servicios de pantalla */
 typedef struct _DisplayServices {
     /* variable que contiene la linea actual donde el cursor de escritura de
@@ -75,5 +81,18 @@ typedef struct _DisplayServices {
     /* puntero a la flag que indica si esta en modo grafico o en modo texto
     , 1 si esta en grafico, y 0 si esta en modo texto */
     uint8_t* IsInPixelsMode;
+    /* funcion para dibujar un fondo de pantalla de un color para rellenar la
+    pantalla, esta funcion solo funciona en modo grafico */
+    KernelSimpleDrawBackground DrawBackgroundColor;
+    /* funcion para dibujar una letra el primer parametro y el segundo son
+    la posicion XY de la letra en la pantalla alineada al modo texto, el
+    tercer parametro es el caracter de la letra, el cuarto y el quinto parametro
+    son la posicion XY que se les sumara a la alineacion del modo texto para
+    que se pueda dibujar en cualquier lado */
+    KernelAdvancedDisplayDrawLetter DrawLetter;
+    /* funcion que obtiene el color en una posicion especifica de la pantalla 
+    el primer y segundo parametro son las posiciones XY de el pixel a obtener
+    y retorna el color del pixel */
+    KernelAdvancedDisplayGetColor GetPixel;
 } DisplayServices;
 #endif

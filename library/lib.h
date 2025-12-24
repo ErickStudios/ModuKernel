@@ -26,6 +26,8 @@ typedef unsigned short     CortoPositivo;
 typedef unsigned int       EnteroPositivo;
 typedef unsigned long long GrandePositivo;
 
+typedef char*               string;
+
 typedef GrandePositivo     DireccionAValor;
 
 #define BanderaActiva       1

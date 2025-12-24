@@ -1,8 +1,9 @@
 /bin/bench;BC0;BIN;
 /bin/calculator;BC1;BIN;
-/bin/helloworld;BC2;BIN;
-/bin/mouse;BC3;BIN;
-/bin/multi;BC4;BIN;
+/bin/desktop;BC2;BIN;
+/bin/helloworld;BC3;BIN;
+/bin/mouse;BC4;BIN;
+/bin/multi;BC5;BIN;
 /dev/drv0;DV0;BIN;
 /sys/help;SY0;BIN;
 /sys/frcache.sh;SH0;NSH;
