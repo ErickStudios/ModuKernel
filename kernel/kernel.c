@@ -2,7 +2,6 @@
 #include "../services/KernelServices.h"
 #include "kernel.h"
 #include "../fs/fat12.h"
-#include "./vga/BitMaps.h"
 
 // incluir funciones y prototipos
 #include "../functions/misc_main.h"
@@ -41,13 +40,7 @@ uint8_t Colorea = 20;
 extern void config_mode();
 extern void unconfig_mode();
 extern void draw_bg(uint8_t Color);
-#ifdef __cplusplus
-extern "C" {
-#endif
 void InternalDrawPixel(uint8_t color, int x, int y, int size);
-#ifdef __cplusplus
-}
-#endif
 extern void InternalGopScreenInit();
 extern void InternalSendCharToSerial(char ch);
 extern uint8_t InternalGrapichalFlag;
@@ -1713,6 +1706,7 @@ void InitializeKernel(KernelServices* Services)
     Mem->FreePool     = &FreePool;
 	Mem->GetFreeHeap  = &InternalGetFreeHeapSpace;
 	Mem->MallocType	  = &MemoryCurrentSystem;
+	Mem->RepairMemory = &InternalSleepDream;
 
     // disco
     Dsk->RunFile    = &ProcessCrtByFile;
@@ -2063,12 +2057,10 @@ void InternalSysCommandExecute(KernelServices* Services, char* command, int lena
 					if (Recorrer == MaxRecorrer)
 					{
 						Recorrer = 0;
-						Services->Display->printg("\n");
+						if ((*Services->Display->IsInPixelsMode) == 0) Services->Display->printg("\n");
 					}
-					else
-					{
-						if (*Services->Display->IsInPixelsMode) Services->Display->printg("\n");
-					}
+
+					if ((*Services->Display->IsInPixelsMode)) Services->Display->printg("  ");
 
 				}
 
@@ -2458,6 +2450,11 @@ void InternalSysCommandExecute(KernelServices* Services, char* command, int lena
 
 		if (StrnCmp(Sizea, "/mw ", 4) == 0) InternalDumpHexMemory(Services->Info->ModuWorldPtr, (size_t)HexStringToInt(Sizea + 4));
 		else InternalDumpHexMemory(heap_start, (size_t)HexStringToInt(Sizea));
+	}
+	else if (StrCmp(command, "logoff") == 0)
+	{
+		Services->Display->printg("login off, yo can press ENTER to wake up the system\n");
+		Services->Memory->RepairMemory(Services);
 	}
 	else {
 		char* Params[128];
@@ -2856,4 +2853,62 @@ void InternalPrintgNonLine(char *message)
 		*line_selected = line;
 		*row_selected = column * 2; // mantener compatibilidad
 	}
+}
+void InternalSleepDream(KernelServices* Serv)
+{
+	int TimeOut = 30;
+
+	// espearar a que el usuario presione una tecla si no se acabara
+	// el tiempo y el OS entrara en otra etapa
+
+	while (TimeOut--) 
+	{
+		// tecla
+		char Key = Serv->InputOutput->ReadKey();
+
+		// etapa terminada
+		if (Key == '\n') return;
+
+		// delay
+		Serv->Time->TaskDelay(2);
+	}
+
+	Serv->Display->printg("[ Kernel ]  Entrando a el Free All Unecesary Memory, una vez que termine puede presionar ENTER para despertar al sistema por ahora no lo puede hacer, espere\n");
+
+	// el sistema entra en la etapa FAUM (Free. All. Unecesary. Memory) donde
+	// aprovechara un garbage collector para liberar memoria del Heap que
+	// o es basura/cache o no fue liberada por que a algun tonto se le haya ocurrido
+	// dejar errores de memoria en los programas, asi que esto es necesario, no se
+	// preocupe pronto estara soñando y podras despertarlo
+
+	// indice
+	BlockHeader* Index = heap_start;
+
+	// liberar
+	while (Index->next) 
+	{
+		// liberar memoria basuara, o no liberada
+		if (
+			Index->Type == MemAllocTypeSystem || Index->Type == MemAllocTypePrograms
+		)
+		 FreePool(Index->MemoryPtr);
+
+		Index = Index->next;
+
+		Serv->Time->TaskDelay(2);
+	}
+
+	Serv->Display->printg("[ Kernel ]  Ya puede despertar al sistema presionando ENTER\n");
+
+	// el sistema ya no tiene mejor cosa que hacer que quedarse dormido
+	// por que ya se libero todo y ya lo puedes despertar sin riesgo de que
+	// si no duerme todo el rato muchas veces se terminara llenando de basuar
+
+	while (1)
+	{
+		char Key = Serv->InputOutput->ReadKey();
+		if (Key == '\n') return;
+		Serv->Time->TaskDelay(1);
+	}
+	
 }

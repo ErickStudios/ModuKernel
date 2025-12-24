@@ -21,3 +21,5 @@ KernelStatus InternalRunBinary(void* buffer, int size, KernelServices* Services)
 FatFile InternalExtendedFindFile(char* path);
 /* para fecha y hora */
 void InternalGetDateTime(KernelDateTime* Time);
+/* para dormir */
+void InternalSleepDream(KernelServices* Serv);

@@ -1,5 +1,6 @@
 #ifndef MemoryServicesDotH
 #define MemoryServicesDotH
+#include "basic.h"
 /* el tipo de creacion de memoria dinamica */
 typedef void* (*KernelMemoryMalloc)(unsigned int size);
 /* para liberar memoria */
@@ -12,6 +13,8 @@ typedef void *(*KernelMemoryCoppy)(void *dest, const void *src, unsigned int n);
 typedef int (*KernelMemoryComparate)(const void *s1, const void *s2, unsigned int n);
 /* el tipo para ver cuanto queda de heap */
 typedef unsigned int (*KernelMemoryGetFreeHeapSize)();
+/* el tipo para dormir al sistema y hacer reparaciones de memoria */
+typedef void (*KernelMemoryRepairMemoryByDream)(struct _KernelServices* Services);
 /* enum para los tipos de memoria dinamica del Kernel */
 typedef enum _ModuAllocType
 {
@@ -66,5 +69,13 @@ typedef struct _MemoryServices {
     /* variable que contiene un puntero a el tipo de allocate del sistema
     para poder cambiar entre tipos */
     ModuAllocType* MallocType;
+    /* funcion para que el sistema entre en la etapa de reparacion de memoria
+    en esta etapa esperar el sistema un rato para que lo despiertes, una
+    vez entre en el FAUM (Free. All. Unecesary. Memory) no lo podras
+    despertar hasta que la memoria basura sea liberada por el garbage collector
+    y despues de que termine el FAUM ya lo podras despertar por que ya esta en sueño
+    siempre lo podras despertar presionando enter en todas las etapas del repair memory
+    menos en el FAUM que alli necesita estar despierto*/
+    KernelMemoryRepairMemoryByDream RepairMemory;
 } MemoryServices;
 #endif
