@@ -148,8 +148,8 @@ config_mode:
 
 	; retrazo horizontal
 
-	AjustarCrtc 0x04, 0x54		; inicio del retrazo de horizontal
-	AjustarCrtc 0x05, 0x80		; fin del retrazo de horizontal
+	AjustarCrtc 0x04, 0x55		; inicio del retrazo de horizontal
+	AjustarCrtc 0x05, 0x81		; fin del retrazo de horizontal
 
 	; donde se configura la parte vertical de la pantalla
 
@@ -244,7 +244,7 @@ config_mode:
 ; supone que debe hacer eso pero esta tan buggeado que solo sierve
 ; para ayudar con mas bugs a que el modo grafico funcione
 unconfig_mode:
-	mov byte [InternalGrapichalFlag], 0x00
+	mov byte [InternalGrapichalFlag], 0x01
 
 	; --- Misc Output ---
 	mov dx, 0x3C2			; puerto

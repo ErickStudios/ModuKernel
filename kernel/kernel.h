@@ -80,19 +80,3 @@ void * InternalMemMove(void *dest, const void *src, int n) {
     }
     return dest;
 }
-
-/* Bloque de memoria y su entrada de memoria */
-typedef struct BlockHeader {
-    /* tamaño del bloque */
-    unsigned int size;
-    /* fue liberado */
-    unsigned char free;
-    /* siguiente */
-    struct BlockHeader* next;
-    /* tipo de memoria */
-    ModuAllocType Type;
-    /* para saber donde esta */
-    char* MemoryPtr;
-} BlockHeader;
-/* el tipo actual de allocation */
-ModuAllocType MemoryCurrentSystem;

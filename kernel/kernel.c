@@ -13,6 +13,9 @@
 // incluir funciones de la libreria c de bajo nivel
 #include "../libc/String.h"
 
+// funciones del kernel
+#include "../services/headers/memory.h"
+
 // servicios globales
 KernelServices* GlobalServices;
 // mayusculas y minusculas
@@ -32,8 +35,8 @@ int CwdLevelDir = 1;
 // el tamaño del programa
 int ProgramMainSize = 0;
 
-static BlockHeader* heap_start = (BlockHeader*)&_heap_start;
-static BlockHeader* free_list = NULL;
+KernelPool* heap_start = (KernelPool*)&_heap_start;
+KernelPool* free_list = NULL;
 
 uint8_t Colorea = 20;
 
@@ -1142,10 +1145,10 @@ void InitHeap()
     //heap_start = (char*)(((unsigned int)heap_start + 7) & ~7);
 
     // Crear bloque único
-    BlockHeader* first = (BlockHeader*)heap_start;
+    KernelPool* first = (KernelPool*)heap_start;
 
     unsigned int total_bytes = (unsigned int)(heap_end - heap_start);
-    unsigned int header_size = sizeof(BlockHeader);
+    unsigned int header_size = sizeof(KernelPool);
 
     // Verificación mínima
     if (total_bytes <= header_size) {
@@ -1275,7 +1278,7 @@ void InternalMusicMuteTone() {
 unsigned int InternalGetFreeHeapSpace() 
 {
     unsigned int total = 0;
-    BlockHeader* current = free_list;
+    KernelPool* current = free_list;
 
     while (current) {
         if (current->free) {
@@ -2298,7 +2301,7 @@ void InternalSysCommandExecute(KernelServices* Services, char* command, int lena
 	else if (StrCmp(command, "") == 0);
 	else if (StrCmp(command, "memmap") == 0)
 	{
-		BlockHeader* Index = heap_start;
+		KernelPool* Index = heap_start;
 
 		while (Index->next)
 		{
@@ -2408,7 +2411,7 @@ void InternalSysCommandExecute(KernelServices* Services, char* command, int lena
 		if (StrCmp(adirection, "/sys") == 0)
 		{
 			// indice
-			BlockHeader* Index = heap_start;
+			KernelPool* Index = heap_start;
 
 			// liberar
 			while (Index->next) 
@@ -2422,7 +2425,7 @@ void InternalSysCommandExecute(KernelServices* Services, char* command, int lena
 		else if (StrCmp(adirection, "/services") == 0)
 		{
 			// indice
-			BlockHeader* Index = heap_start;
+			KernelPool* Index = heap_start;
 
 			// liberar
 			while (Index->next) 
@@ -2436,7 +2439,7 @@ void InternalSysCommandExecute(KernelServices* Services, char* command, int lena
 		else if (StrCmp(adirection, "/user") == 0)
 		{
 			// indice
-			BlockHeader* Index = heap_start;
+			KernelPool* Index = heap_start;
 
 			// liberar
 			while (Index->next) 
@@ -2450,7 +2453,7 @@ void InternalSysCommandExecute(KernelServices* Services, char* command, int lena
 		else if (StrCmp(adirection, "/") == 0)
 		{
 			// indice
-			BlockHeader* Index = heap_start;
+			KernelPool* Index = heap_start;
 
 			// liberar
 			while (Index->next) 
@@ -2729,15 +2732,15 @@ KernelStatus ProcessCrtByFile(char* name, char* ext, KernelServices* Services)
 }
 void* InternalAllocatePool(unsigned int size, ModuAllocType Type) 
 {
-    BlockHeader* current = free_list;
+    KernelPool* current = free_list;
 
     while (current) {
         if (current->free && current->size >= size) {
 
-            if (current->size > size + sizeof(BlockHeader)) {
+            if (current->size > size + sizeof(KernelPool)) {
                 // dividir el bloque
-                BlockHeader* new_block = (BlockHeader*)((char*)current + sizeof(BlockHeader) + size);
-                new_block->size = current->size - size - sizeof(BlockHeader);
+                KernelPool* new_block = (KernelPool*)((char*)current + sizeof(KernelPool) + size);
+                new_block->size = current->size - size - sizeof(KernelPool);
                 new_block->free = 1;
                 new_block->next = current->next;
 
@@ -2748,9 +2751,9 @@ void* InternalAllocatePool(unsigned int size, ModuAllocType Type)
             current->size = size;
 			current->Type = Type;
 		
-			current->MemoryPtr = (char*)current + sizeof(BlockHeader);
+			current->MemoryPtr = (char*)current + sizeof(KernelPool);
 
-            return (char*)current + sizeof(BlockHeader);
+            return (char*)current + sizeof(KernelPool);
         }
 
         current = current->next;
@@ -2768,21 +2771,21 @@ void* AllocatePool(unsigned int size)
 void FreePool(void* ptr) {
     if (!ptr) return;
 
-    BlockHeader* block = (BlockHeader*)((char*)ptr - sizeof(BlockHeader));
+    KernelPool* block = (KernelPool*)((char*)ptr - sizeof(KernelPool));
     block->free = 1;
 	block->Type = MemAllocTypeFreeOrNotExist;
 
-    BlockHeader* current = free_list;
+    KernelPool* current = free_list;
 
     while (current && current->next) {
-        BlockHeader* next = current->next;
+        KernelPool* next = current->next;
 
         // verificar que estén contiguos en memoria
         if (current->free && next->free &&
-            (char*)current + sizeof(BlockHeader) + current->size == (char*)next) {
+            (char*)current + sizeof(KernelPool) + current->size == (char*)next) {
 
             // unir bloques
-            current->size += sizeof(BlockHeader) + next->size;
+            current->size += sizeof(KernelPool) + next->size;
             current->next = next->next;
         } else {
             current = current->next;
@@ -2943,7 +2946,7 @@ void InternalSleepDream(KernelServices* Serv)
 	// preocupe pronto estara soñando y podras despertarlo
 
 	// indice
-	BlockHeader* Index = heap_start;
+	KernelPool* Index = heap_start;
 
 	// liberar
 	while (Index->next) 

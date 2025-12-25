@@ -17,6 +17,7 @@ KernelStatus ErickMain(KernelServices* Services)
     // ejecutar
     if (!(_StatusError(OpenFileBin)))
         Services->Misc->RunBinary(content, size, Services);
+        Services->Memory->FreePool(content);
     else 
     {
         Services->Memory->FreePool(content);
