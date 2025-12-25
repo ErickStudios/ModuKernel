@@ -2,6 +2,8 @@
 #define DiskServicesDotH
 // incluir basicos
 #include "basic.h"
+// incluir los tipos de disco
+#include "disk/unities.h"
 /* declaracion temprana */
 struct _KernelServices;
 /* archivo fat */
@@ -49,5 +51,7 @@ typedef struct _DiskServices {
     utiliza esta funcion, retorna una estructura con informacion del archivo 
     y el bootsector en el cual esta  */
     KernelSimpleDiskOpen OpenFile;
+    /* puntero al tipo de disco actual del sistema */
+    DiskTypePort* CurrentDiskType;
 } DiskServices;
 #endif

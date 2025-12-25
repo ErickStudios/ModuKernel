@@ -15,6 +15,7 @@
 
 // funciones del kernel
 #include "../services/headers/memory.h"
+#include "../services/headers/disk.h"
 
 // servicios globales
 KernelServices* GlobalServices;
@@ -46,8 +47,17 @@ extern void InternalDrawBackground(uint8_t Color);
 void InternalDrawPixel(uint8_t color, int x, int y, int size);
 extern void InternalGopScreenInit();
 extern void InternalSendCharToSerial(char ch);
+extern void InternalKernelHaltReal();
 extern uint8_t InternalGrapichalFlag;
 
+void InternalKernelHalt()
+{
+	// no se puede en modo usuario
+	if (MemoryCurrentSystem == MemAllocTypePrograms || MemoryCurrentSystem == MemAllocTypeProgramsStackMemory) return;
+
+	// llamar a halt
+	InternalKernelHaltReal();
+}
 void DrawBitmap(const uint8_t* BitMap, int x, int y, uint8_t color) {
     int height = 7;
     int width  = 6;
@@ -1168,7 +1178,125 @@ void vga_putpixel(int x, int y, uint8_t color)
     uint8_t* vram = (uint8_t*)0xA0000;
     vram[y*320 + x] = color;
 }
-KernelStatus InternalDiskReadSector(unsigned int lba, unsigned char* buffer) 
+KernelStatus InternalFloppyDiskReadSector(unsigned int lba, unsigned char* buffer_phys /* debe ser física y <1MiB */)
+{
+    // 1. LBA -> CHS
+    unsigned int cyl = lba / (2 * 18);
+    unsigned int head = (lba / 18) % 2;
+    unsigned int sec = (lba % 18) + 1;
+
+    // 2. Encender motor y seleccionar unidad 0
+    outb(FDC_DOR, 0x1C); // motor A on, DMA/IRQ enable, drive 0
+
+    // 3. Data rate 500 kbps
+    outb(FDC_DSR, 0x00);
+
+    // 4. CONFIGURE (0x13): FIFO habilitado, threshold 8, implied seek off
+    fdc_write(0x13);
+    fdc_write(0x00); // msr config
+    fdc_write(0x0F); // FIFO threshold
+    fdc_write(0x00); // precomp
+
+    // 5. SPECIFY (0x03): tiempos
+    fdc_write(0x03);
+    fdc_write(0xDF); // SRT=13ms, HUT=240ms (ejemplo)
+    fdc_write(0x02); // HLT=2ms, ND=0
+
+    // 6. RECALIBRATE (0x07) unidad 0 y esperar IRQ6 (usa tu handler/flag)
+    fdc_write(0x07);
+    fdc_write(0x00);
+    // espera_irq6();
+
+    // 7. SEEK (0x0F) al cilindro
+    fdc_write(0x0F);
+    fdc_write((head << 2) | 0x00); // head+drive
+    fdc_write(cyl);
+    // espera_irq6();
+
+    // 8. Programar DMA canal 2 para leer 512 bytes a buffer_phys
+    // Nota: buffer debe estar en memoria baja física (<1MiB), alineado.
+    outb(DMA_MASK, 0x06);       // mask canal 2
+    outb(DMA_CLEARFF, 0x00);    // clear flip-flop
+    outb(DMA_MODE, 0x56);       // canal 2, read, single, address inc
+    outb(DMA_CH2_ADDR, (uint8_t)( (uint32_t)buffer_phys & 0xFF ));
+    outb(DMA_CH2_ADDR, (uint8_t)( ((uint32_t)buffer_phys >> 8) & 0xFF ));
+    outb(DMA_CH2_PAGE, (uint8_t)( ((uint32_t)buffer_phys >> 16) & 0xFF ));
+    outb(DMA_CLEARFF, 0x00);
+    outb(DMA_CH2_COUNT, 0xFF);  // 512-1 = 0x1FF -> low
+    outb(DMA_CH2_COUNT, 0x01);  // high
+    outb(DMA_MASK, 0x02);       // unmask canal 2
+
+    // 9. READ DATA (0x06)
+    fdc_write(0x06);
+    fdc_write((head << 2) | 0x00); // head+drive
+    fdc_write(cyl);
+    fdc_write(head);
+    fdc_write(sec);
+    fdc_write(0x02); // tamaño = 512 bytes (2^2)
+    fdc_write(18);   // EOT
+    fdc_write(0x1B); // GAP3
+    fdc_write(0xFF); // DTL
+
+    // 10. Esperar IRQ6 que indica finalización de la transferencia
+    // espera_irq6();
+
+    // 11. Leer result bytes (7) para chequear estado
+    uint8_t st0 = fdc_read();
+    uint8_t st1 = fdc_read();
+    uint8_t st2 = fdc_read();
+    uint8_t st3 = fdc_read();
+    uint8_t rcyl = fdc_read();
+    uint8_t rhead = fdc_read();
+    uint8_t rsec = fdc_read();
+    // Validar ST1/ST2 sin errores, y posición devuelta
+
+    // 12. Apagar motor si deseas
+    outb(FDC_DOR, 0x0C);
+
+    return KernelStatusSuccess;
+}
+KernelStatus InternalCdRomDiskReadSector(unsigned int lba, unsigned char* buffer)
+{
+    // 1. Seleccionar unidad ATAPI (maestro/esclavo)
+    outb(0x1F6, 0xA0); // maestro ATAPI
+
+    // 2. Enviar PACKET command
+    outb(0x1F7, 0xA0);
+
+    // 3. Esperar DRQ (device ready to receive packet)
+    int timeout = 100000;
+    while (!(inb(0x1F7) & 0x08) && timeout--) {
+        if (timeout < 1) return KernelStatusInfiniteLoopTimeouted;
+    }
+
+    // 4. Construir paquete SCSI READ(10) (12 bytes)
+    uint8_t packet[12] = {0};
+    packet[0] = 0x28; // READ(10)
+    packet[2] = (lba >> 24) & 0xFF;
+    packet[3] = (lba >> 16) & 0xFF;
+    packet[4] = (lba >> 8) & 0xFF;
+    packet[5] = lba & 0xFF;
+    packet[9] = 1; // número de bloques a leer
+
+    // 5. Escribir el paquete en el puerto de datos (0x1F0)
+    for (int i = 0; i < 6; i++) {
+        outw(0x1F0, ((uint16_t*)packet)[i]);
+    }
+
+    // 6. Esperar DRQ para datos
+    timeout = 100000;
+    while (!(inb(0x1F7) & 0x08) && timeout--) {
+        if (timeout < 1) return KernelStatusInfiniteLoopTimeouted;
+    }
+
+    // 7. Leer 2048 bytes (1024 palabras)
+    for (int i = 0; i < 1024; i++) {
+        ((uint16_t*)buffer)[i] = inw(0x1F0);
+    }
+
+    return KernelStatusSuccess;
+}
+KernelStatus InternalAtaDiskReadSector(unsigned int lba, unsigned char* buffer) 
 {
 	// lo lee 1
     outb(0x1F6, 0xE0 | ((lba >> 24) & 0x0F)); 
@@ -1188,6 +1316,18 @@ KernelStatus InternalDiskReadSector(unsigned int lba, unsigned char* buffer)
 
 	// retornar status
 	return KernelStatusSuccess;
+}
+KernelStatus InternalRealDiskReadSector(unsigned int lba, unsigned char* buffer, DiskTypePort FileSystem)
+{
+	return 	(
+			(FileSystem == DiskTypeHardDisk) ? InternalAtaDiskReadSector(lba, buffer) : 
+			(FileSystem == DiskTypeFloppy) ? InternalFloppyDiskReadSector(lba, buffer) :
+			(FileSystem == DiskTypeCdRom) ? InternalCdRomDiskReadSector(lba, buffer) :
+			KernelStatusInvalidParam);
+}
+KernelStatus InternalDiskReadSector(unsigned int lba, unsigned char* buffer) 
+{
+	InternalRealDiskReadSector(lba, buffer, SystemCwkDisk);
 }
 FatFile InternalDiskFindFile(char* name, char* ext) 
 {
@@ -1743,11 +1883,13 @@ void InitializeKernel(KernelServices* Services)
 	Mem->RepairMemory = &InternalSleepDream;
 
     // disco
-    Dsk->RunFile    = &ProcessCrtByFile;
-    Dsk->FindFile   = &InternalDiskFindFile;
-    Dsk->GetFile    = &InternalDiskGetFile;
-    Dsk->ReadSector = &InternalDiskReadSector;
-	Dsk->OpenFile 	= &InternalExtendedFindFile;
+    Dsk->RunFile    	= &ProcessCrtByFile;
+    Dsk->FindFile   	= &InternalDiskFindFile;
+    Dsk->GetFile    	= &InternalDiskGetFile;
+    Dsk->ReadSector 	= &InternalDiskReadSector;
+	Dsk->OpenFile 		= &InternalExtendedFindFile;
+
+	Dsk->CurrentDiskType= &SystemCwkDisk;
 
 	// tiempo
 	Tim->TaskDelay 	= &InternalWaitEticks;
@@ -1804,13 +1946,33 @@ FatFile InternalExtendedFindFile(char* path)
                 char ext[4]; InternalMemorySet(ext, ' ', 3); ext[3] = '\0';
                 for (int j = 0; j < StrLen(extRaw) && j < 3; j++) ext[j] = extRaw[j];
 
-                GlobalServices->Memory->FreePool(buffer);
                 return GlobalServices->File->FindFile(name, ext);
             }
         }
 
         GlobalServices->Memory->FreePool(buffer);
     }
+	else
+	{
+	    GlobalServices->Memory->FreePool(buffer);
+
+		char* entry[2];
+	    int entryLen = StrSplit(path, entry, '.');
+
+		char* nameRaw = entry[0];
+
+		if (nameRaw[0] == '/') nameRaw++;
+
+        char* extRaw  = entry[1];
+
+		char name[9]; InternalMemorySet(name, ' ', 8); name[8] = '\0';
+        for (int j = 0; j < StrLen(nameRaw) && j < 8; j++) name[j] = nameRaw[j];
+
+        char ext[4]; InternalMemorySet(ext, ' ', 3); ext[3] = '\0';
+        for (int j = 0; j < StrLen(extRaw) && j < 3; j++) ext[j] = extRaw[j];
+
+        return GlobalServices->File->FindFile(name, ext);
+	}
 
 	FatFile fileNull = {0};
     return fileNull; // no encontrado
@@ -2499,6 +2661,39 @@ void InternalSysCommandExecute(KernelServices* Services, char* command, int lena
 	else if (StrCmp(command, "ugrm") == 0) unconfig_mode();
 	else if (StrCmp(command, "grm") == 0) config_mode();
 	else if (StrCmp(command, "shell") == 0) InternalMiniKernelProgram(Services);
+	else if (StrCmp(command , "map") == 0)
+	{
+		Services->Display->printg("HDA:   (Hard Disk)\n");
+		Services->Display->printg("FDA:   (Floppy Disk)\n");
+		Services->Display->printg("CDROM: (CD-ROM)\n");
+	}
+	else if (command[len - 1] == ':')
+	{
+		// reservar espacio (+1 para el terminador)
+		char* NewStr = Services->Memory->AllocatePool(sizeof(char) * (len + 1));
+
+		// copiar la cadena original
+		Services->Memory->CoppyMemory(NewStr, command, len);
+
+		// añadir terminador nulo
+		NewStr[len] = '\0';
+
+		// convertir a mayúsculas
+		char* Upper = StrUpr(NewStr);
+
+		// quitar el ':' final
+		Upper[len - 1] = '\0';
+
+		// cambiar a floppy
+		if (StrCmp(Upper, "FDA") == 0) *(Services->File->CurrentDiskType) = DiskTypeFloppy;
+		// cambiar a hard disk
+		else if (StrCmp(Upper, "HDA") == 0) *(Services->File->CurrentDiskType) = DiskTypeHardDisk;
+		// cambiar a cdrom
+		else if (StrCmp(Upper, "CDROM") == 0) *(Services->File->CurrentDiskType) = DiskTypeCdRom;
+	
+		// liberar pool
+		Services->Memory->FreePool(Upper);
+	}
 	else {
 		char* Params[128];
 		int ParamsCount = StrSplit(command, Params, ' ');
@@ -2592,6 +2787,9 @@ void k_main()
 {
 	// etapa de arranque prematura aqui se inicializan los servicios basicos
 	// mas no los servicios del kernel donde se iniciaran prototipadamente
+
+	// el tipo de disco actual
+	SystemCwkDisk = DiskTypeHardDisk;
 
 	// memoria actual
 	MemoryCurrentSystem = MemAllocTypeKernelServices;

@@ -68,7 +68,7 @@ echo "/fs.struct;FSLST;IFS;" >> disk/FSLST.IFS
 echo "making"
 
 # Disk image (explicit raw to avoid warning)
-qemu-img create -f raw build/disk.img 10M
+qemu-img create -f raw build/disk.img 1M
 mkfs.fat -F 12 build/disk.img
 
 sudo mkdir -p /mnt/disk_qemu
@@ -91,10 +91,22 @@ menuentry "ModuKernel" {
 EOF
 grub-mkrescue -o build/os.iso config
 
+dd if=/dev/zero of=build/floppy.img bs=1024 count=1440
+mkfs.fat -F 12 build/floppy.img
+
+mkdir -p /mnt/qemu_floppy
+sudo mount -o loop build/floppy.img /mnt/qemu_floppy
+
+# como plus puedes usar tambien una unidad de floppy disk
+sudo cp floppy/* /mnt/qemu_floppy/
+
+sudo umount /mnt/qemu_floppy
+
 # Run QEMU via GRUB so framebuffer is honored
 qemu-system-i386 \
   -cdrom build/os.iso \
   -boot d \
+  -fda build/floppy.img \
   -hda build/disk.img \
   -m 512M \
   -vga std \

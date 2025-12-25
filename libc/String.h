@@ -192,6 +192,16 @@ int StrSplit(char* str, char** buffer, char splitter)
 
     return count;
 }
+char* StrUpr(char* str)
+{
+    char* p = str;
+    while (*p) {
+        *p = (char)CharToUpCase((unsigned char)*p);
+        p++;
+    }
+    return str;
+}
+
 // devuelve un puntero al primer carácter encontrado, o NULL si no existe
 char* StrChr(const char* str, int ch) {
     while (*str) {

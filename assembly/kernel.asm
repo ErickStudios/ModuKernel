@@ -27,6 +27,7 @@ section .text
 
 ; funciones de assembly estandart
 global start					; funcion de inicio
+global InternalKernelHaltReal	; funcion de detencion
 
 ; funciones de configuracion y desconfiguracion de modos
 global config_mode				; funcion que configura el modo grafico
@@ -68,8 +69,20 @@ start:
     add esp, 4					; no hay nada
 
 	; detencion estandart
-	hlt							; si algo sale mal congelar
+	call InternalKernelHaltReal	; si algo sale mal congelar
 	ret							; por que pasara esto, bueno esta por si acaso
+
+; halt detiene el procesador para hacer cosas que ya no estan
+; y por ejemplo se puede detener
+InternalKernelHaltReal:
+
+	; instrucciones de por medio
+	nop							; hacer nada
+
+	; llamar
+	jmp InternalKernelHaltReal	; llamar a halt
+
+	ret
 
 ; configura el modo grafico, esto no funciona por si solo, se necesita
 ; salir entrar salir entrar y mas secuncias raras que parece que todo
