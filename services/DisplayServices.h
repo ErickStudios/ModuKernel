@@ -25,6 +25,8 @@ typedef void (*KernelSimpleDrawBackground)(uint8_t);
 typedef void (*KernelAdvancedDisplayDrawLetter)(int x, int y, char letter, uint8_t color, int ofX, int Of);
 /* el tipo para obtener el color en una zona especifica */
 typedef uint8_t (*KernelAdvancedDisplayGetColor)(int x, int y);
+/* el tipo para dibujar */
+typedef void (*KernelAdvancedDisplayBlt)(uint8_t color, int x, int y, int SizeX, int SizeY);
 /* el tipo de servicios de pantalla */
 typedef struct _DisplayServices {
     /* variable que contiene la linea actual donde el cursor de escritura de
@@ -94,5 +96,9 @@ typedef struct _DisplayServices {
     el primer y segundo parametro son las posiciones XY de el pixel a obtener
     y retorna el color del pixel */
     KernelAdvancedDisplayGetColor GetPixel;
+    /* funcion para dibujar un rectangul, el primer parametro es el color,
+    el segundo y tercero son la posicion X,Y de el rectangulo, el cuarto
+    y quinto es el tamaño X,Y del rectangulo */
+    KernelAdvancedDisplayBlt Blt;
 } DisplayServices;
 #endif

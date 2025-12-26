@@ -1,6 +1,8 @@
 ModuKernel
 ===============================
 
+![ModuKernel](./assets/QemuWindowWithModuKernel.png)
+
 basado en: https://github.com/debashisbarman/Simple-Kernel-in-C-and-Assembly
 
 Bienvenidos a ModuKernel! un proyecto basado en otro pero este sirve para enseñar a la comunidad española como hacer un kernel modular
@@ -20,7 +22,7 @@ por ahora estas son las unidades de almacenamiento que ofrece y estan programada
 | ------------- | ------------- | ------------- |
 | HardDisk | ✅ | Es el formato original |
 | FloppyDisk | ⚠️ | Probado, funciona a medias, no soporta FSLST.IFS |
-| CD-ROM | ❌ | No garantizado |
+| CD-ROM | ⚠️ | No garantizado |
 
 ## Compatibilidad con drivers
 
@@ -31,7 +33,7 @@ por ahora estos son los drivers probados y que funcionan a medias
 | Teclado | ✅ | Soporte primitivo, estable |
 | Mouse | ⚠️ | Soporte adicional, solo con funciones externas al kernel, inestable |
 | VGA (Modo texto) | ✅ | Soporte primitivo, estable |
-| VGA (Modo grafico) | ⚠️ | Inestable y buggeado, cada byte del display ocupa 4 pixeles |
+| VGA (Modo grafico) | ✅ | Soporte como plus |
 
 ## Compatibilidad con sistemas de archivos
 
@@ -49,7 +51,6 @@ Estas son las diferencias al estandart
 * El teclado no se adapta, siempre usa el **layout ingles**
 * Los simbolos y el keymap aunque usan el ingles no es el mismo, usa uno parecido pero por limitaciones require que unas teclas sean diferentes
 * **No hay soporte para paginacion**
-* Muchas funciones como el **modo grafico** estan un poco buggeadas asi que solo utilizalas cuando las necesties
 * El modo grafico esta tan bugeado que **no se puede volver al modo texto** por algun bug debido a esto, el sistema en los servicios no incluye una funcion para volver al modo texto
 
 Estos inconvenientes son por errores y bugs que son mas del **BIOS** que del OS, aunque se intente replicar por ejemplo del int 10h no funciona bien, y esto hace que funciones como el modo grafico esten buggeadas

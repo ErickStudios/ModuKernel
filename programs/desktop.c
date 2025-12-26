@@ -170,7 +170,16 @@ void DrawDesktop(struct _DesktopContext* Desktop, struct _MouseState* Mouse)
         
         Entero PosX = gDS->CurrentCharacter;
 
+        gDS->Blt(
+            6, 
+            ((gDS->CurrentCharacter * 5)) + 2, 
+            ((gDS->CurrentLine+1) * 8) - 1,
+            (StrLen(Text) * 5),
+            1
+        );
+        
         gDS->printg(Text);
+        
         Entero PosXa = gDS->CurrentCharacter;
 
         if (Menu.Activado)

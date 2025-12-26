@@ -151,22 +151,20 @@ config_mode:
 
 	; display horizontal
 
-	AjustarCrtc 0x00, 0x5F		; total de horizontal
-	AjustarCrtc 0x01, 0x4F		; fin del display horizontal
+	; retrazo horizontal
+	AjustarCrtc 0x00, 0x9F		; total de horizontal
+
+	AjustarCrtc 0x04, 0x52		; inicio del retrazo de horizontal
+	AjustarCrtc 0x05, 0x56		; fin del retrazo de horizontal
+	AjustarCrtc 0x01, 0x8F		; fin del display horizontal
 
 	; blanco horizontal
-
 	AjustarCrtc 0x02, 0x50		; inicio del blanco horizontal
-	AjustarCrtc 0x03, 0x82		; fin del blanco horizontal
-
-	; retrazo horizontal
-
-	AjustarCrtc 0x04, 0x55		; inicio del retrazo de horizontal
-	AjustarCrtc 0x05, 0x81		; fin del retrazo de horizontal
+	AjustarCrtc 0x03, 0x24		; fin del blanco horizontal
 
 	; donde se configura la parte vertical de la pantalla
 
-	AjustarCrtc 0x06, 0xBF		; total del vertical
+	AjustarCrtc 0x06, 0xCF		; total del vertical
 
 	; overflow
 	AjustarCrtc 0x07, 0x1F
@@ -180,15 +178,15 @@ config_mode:
 	AjustarCrtc 0x0F, 0x00
 
 	; retrazo vertical
-	AjustarCrtc 0x10, 0x9C		; inicio del retrazo vertical
-	AjustarCrtc 0x11, 0x8E		; fin del retrazo vertical
-	AjustarCrtc 0x12, 0x8F		; fin del display vertical
+	AjustarCrtc 0x10, 0x10C		; inicio del retrazo vertical
+	AjustarCrtc 0x11, 0xFE		; fin del retrazo vertical
+	AjustarCrtc 0x12, 0xFF		; fin del display vertical
 
 	; offset
-	AjustarCrtc 0x13, 0x28
+	AjustarCrtc 0x13, 0x50
 
 	; ubicacion de underline
-	AjustarCrtc 0x14, 0x40
+	AjustarCrtc 0x14, 0x80
 
 	; blanco vertical
 
@@ -378,51 +376,6 @@ InternalDrawBackground:
     mov edi, 0xA0000		; la direccion de la pantalla
     mov ecx, 320*200		; el tamaño del dibujado
     rep stosb				; repetirlo
-
-    ret
-
-; dibujar un pixel a la pantalla grafica, tiene algunos bugs
-; raros de que aunque sea 1 el tamaño da 8 pixeles pero buenp
-InternalDrawPixel:
-
-	; guardar registros para no perderlos y luego poder 
-	; restaurarlos
-
-    push ebx				; ebx
-    push esi				; esi
-    push edi				; edi
-    push ebp				; ebp
-
-	; el color del pixel
-    mov eax, [esp+4 + 16]	; obtener parametro
-    mov bl, al				; moverlo
-
-	; la posicion en x
-    mov eax, [esp+8 + 16]	; obtener parametro
-    mov esi, eax			; moverlo
-
-	; la posicion en y
-    mov eax, [esp+12 + 16]	; obtener parametro
-    mov edi, eax			; moverlo
-	
-	; el tamaño
-    mov eax, [esp+16 + 16]	; obtener parametro
-    mov ecx, eax			; moverlo
-
-	; loop de repeticion
-    mov eax, edi			; posicion y
-    imul eax, 80			; multiplicarle las lineas
-    add eax, esi			; sumarle la x
-    add eax, 0xA0000    	; base de video
-    mov edi, eax			; mover eax a edi
-    mov al, bl				; moverlo a al
-    rep stosb				; repetir
-
-	; restaurar los registros para no perderlos
-    pop ebp					; ebp
-    pop edi					; direccion
-    pop esi					; esi
-    pop ebx					; ebx
 
     ret
 

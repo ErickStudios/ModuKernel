@@ -44,12 +44,23 @@ uint8_t Colorea = 20;
 extern void config_mode();
 extern void unconfig_mode();
 extern void InternalDrawBackground(uint8_t Color);
-void InternalDrawPixel(uint8_t color, int x, int y, int size);
 extern void InternalGopScreenInit();
 extern void InternalSendCharToSerial(char ch);
 extern void InternalKernelHaltReal();
 extern uint8_t InternalGrapichalFlag;
 
+void InternalDrawPixel(uint8_t color, int x, int y) 
+{
+    uint8_t* vram = (uint8_t*)0xA0000;
+    vram[y*160 + x] = color;
+}
+void InternalBlitingRectangle(uint8_t color, int x, int y, int SizeX, int SizeY)
+{
+	for (size_t yP = 0; yP < SizeY; yP++)
+	{
+		for (size_t xP = 0; xP < SizeX; xP++) InternalDrawPixel(color, (x + xP), (y + yP));
+	}
+}
 void InternalKernelHalt()
 {
 	// no se puede en modo usuario
@@ -65,11 +76,7 @@ void DrawBitmap(const uint8_t* BitMap, int x, int y, uint8_t color) {
         uint8_t line = BitMap[row];
         for (int col = 0; col < width; col++) {
             if (line & (1 << (7 - col))) {   // ← invertimos el orden
-                InternalDrawPixel(
-					color, 
-					(x + col) + ((y + row) * 80), 
-					0, 
-					1);
+				InternalDrawPixel(color, (x + col), y + row);
             }
         }
     }
@@ -989,7 +996,7 @@ uint8_t InternalPixelGetColorOf(int x, int y)
 
 	uint8_t* VidMem = (uint8_t *)0xA0000;
 
-	return VidMem[(y * 80) + x];
+	return VidMem[(y * 160) + x];
 }
 uint8_t ReadRTC(uint8_t reg) 
 { 
@@ -1172,11 +1179,6 @@ void InitHeap()
     first->next = NULL;
 
     free_list = first;
-}
-void vga_putpixel(int x, int y, uint8_t color) 
-{
-    uint8_t* vram = (uint8_t*)0xA0000;
-    vram[y*320 + x] = color;
 }
 KernelStatus InternalFloppyDiskReadSector(unsigned int lba, unsigned char* buffer_phys /* debe ser física y <1MiB */)
 {
@@ -1859,6 +1861,7 @@ void InitializeKernel(KernelServices* Services)
 	Dsp->DrawBackgroundColor=&InternalDrawBackground;
 	Dsp->DrawLetter 	   = &DrawLetterOffset;
 	Dsp->GetPixel		   = &InternalPixelGetColorOf;
+	Dsp->Blt			   = &InternalBlitingRectangle;
 
     Dsp->CurrentLine      = 0;
     Dsp->CurrentCharacter = 0;
@@ -3048,10 +3051,10 @@ void InternalPrintgNonLine(char *message)
 		{
 			InternalSendCharToSerial(message[letter]);
 
-			if (line >= 25) {
+			if (line >= 32) {
 				char* vidmem = (char *)0xA0000;
-				InternalMemMove(vidmem, vidmem + (320 * 2), 320*200);
-				line = 24;
+				InternalMemMove(vidmem, vidmem + (320 * 4), 320*200);
+				line = 31;
 			}
 			if (message[letter] == '\n')
 			{
@@ -3065,7 +3068,7 @@ void InternalPrintgNonLine(char *message)
 				column++;
 			}
 
-			if (column >= 16)
+			if (column >= 28)
 			{
 				line++;
 				column = 0;
