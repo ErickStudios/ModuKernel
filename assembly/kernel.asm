@@ -46,6 +46,10 @@ global InternalSendCharToSerial	; funcion para enviar caracteres a la consola se
 ; funciones
 extern InternalPrintgNonLine	; funcion de impresion
 extern k_main					; funcion principal
+extern init_gdt
+
+; variables
+extern gdt_ptr
 
 ; principal
 start:
@@ -55,6 +59,27 @@ start:
 
 	; funciones de estandart
     cli							; desactivar interrupciones
+
+	; inicializar gdt
+	call init_gdt				; funciones de gdt
+	lgdt [gdt_ptr]       		; carga la GDT definida en C
+	
+	; recargas
+	jmp 0x08:flush_cs    		; far jump para recargar CS
+	ret							; que diablos tiene que pasar para que pase eso?
+
+; esta funcion hace que cs se flushee
+flush_cs:
+
+	; inicializar AX
+    mov ax, 0x10				; valor
+
+	; inicializar valores
+    mov ds, ax					; ax->ds
+    mov es, ax					; ax->es
+    mov fs, ax					; ax->fs
+    mov gs, ax					; ax->gs
+    mov ss, ax					; ax->ss
 
 	; funciones de kernel y inicializar
 	call init_serial			; iniciar serial
@@ -431,3 +456,6 @@ InternalSendCharToSerial:
 	pop eax					; el argumento
 
     ret
+
+section .bss
+	STACK_SPACE: resb 128000 ; 128 KB OF STACK

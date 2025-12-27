@@ -16,6 +16,7 @@
 // funciones del kernel
 #include "../services/headers/memory.h"
 #include "../services/headers/disk.h"
+#include "../services/headers/gdt.h"
 
 // servicios globales
 KernelServices* GlobalServices;
@@ -36,19 +37,67 @@ int CwdLevelDir = 1;
 // el tamaño del programa
 int ProgramMainSize = 0;
 
+// pools del kernel
 KernelPool* heap_start = (KernelPool*)&_heap_start;
 KernelPool* free_list = NULL;
 
-uint8_t Colorea = 20;
-
+extern uint8_t InternalGrapichalFlag;
 extern void config_mode();
 extern void unconfig_mode();
 extern void InternalDrawBackground(uint8_t Color);
 extern void InternalGopScreenInit();
 extern void InternalSendCharToSerial(char ch);
 extern void InternalKernelHaltReal();
-extern uint8_t InternalGrapichalFlag;
+#define PIT_FREQUENCY     1193182
+#define PIT_PORT_COMMAND  0x43
+#define PIT_PORT_CHANNEL0 0x40
 
+struct GDTEntry gdt[3];
+struct GDTPtr gdt_ptr;
+
+extern struct GDTPtr gdt_ptr;
+
+void init_gdt() {
+    gdt_ptr.limit = (sizeof(gdt) - 1);
+    gdt_ptr.base  = (uint32_t)&gdt;
+
+    // Null descriptor
+    gdt[0] = (struct GDTEntry){0,0,0,0,0,0};
+
+    // Code segment
+    gdt[1].limit_low    = 0xFFFF;
+    gdt[1].base_low     = 0x0000;
+    gdt[1].base_middle  = 0x00;
+    gdt[1].access       = 0x9A;   // code, ring 0
+    gdt[1].granularity  = 0xCF;   // 4K granularity, 32-bit
+    gdt[1].base_high    = 0x00;
+
+    // Data segment
+    gdt[2].limit_low    = 0xFFFF;
+    gdt[2].base_low     = 0x0000;
+    gdt[2].base_middle  = 0x00;
+    gdt[2].access       = 0x92;   // data, ring 0
+    gdt[2].granularity  = 0xCF;
+    gdt[2].base_high    = 0x00;
+}
+
+
+void pit_init(uint32_t freq) {
+    uint16_t divisor = (uint16_t)(PIT_FREQUENCY / freq);
+
+    // Comando: canal 0, acceso low/high, modo 3, binario
+    outb(PIT_PORT_COMMAND, 0x36);
+
+    // Enviar divisor (low byte, luego high byte)
+    outb(PIT_PORT_CHANNEL0, divisor & 0xFF);
+    outb(PIT_PORT_CHANNEL0, (divisor >> 8) & 0xFF);
+}
+uint16_t pit_read_counter() {
+    outb(0x43, 0x00); // latch canal 0
+    uint8_t lo = inb(0x40);
+    uint8_t hi = inb(0x40);
+    return (hi << 8) | lo;
+}
 void InternalDrawPixel(uint8_t color, int x, int y) 
 {
     uint8_t* vram = (uint8_t*)0xA0000;
@@ -2787,7 +2836,7 @@ KernelStatus InternalMiniKernelProgram(KernelServices* Services)
 	}
 }
 void k_main() 
-{
+{ 
 	// etapa de arranque prematura aqui se inicializan los servicios basicos
 	// mas no los servicios del kernel donde se iniciaran prototipadamente
 
@@ -2840,7 +2889,7 @@ void k_main()
 
 	// limpiar la pantalla
 	Services.Display->clearScreen();
-
+	
 	// esto no es otra etapa de arranque, sigue siendo la etapa de arranque normal
 	// aunque aqui se hace una animacion para que no se vea muy cutre, recuerden, pueden
 	// personalizarla si se basan en el kernel

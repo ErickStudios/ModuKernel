@@ -25,6 +25,13 @@ SECTIONS
     __bss_end = .;        /* marca fin de bss */
     }
 
+    .kstack (NOLOAD) :
+    {
+        __kstack_start = .;
+        . = . + 0x4000;      /* 16 KiB de pila */
+        __kstack_end = .;    /* top de la pila */
+    }
+
     /* para AllocatePool y Servicios.Memory->AllocatePool*/
     _heap_start = .;
     /* fin del heap */
