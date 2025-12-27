@@ -60,6 +60,25 @@ extern function InternalGopScreenInit();
 extern function InternalSendCharToSerial(char ch);
 extern function InternalKernelHaltReal();
 
+void InternalSendCharToSerialFy(char ch) {
+    // esperar transmisor listo
+    while ((inb(0x3F8 + 5) & 0x20) == 0);
+
+    // enviar carácter
+    outb(0x3F8, (uint8_t)ch);
+}
+
+void InternalDebug(char* str)
+{
+	char* String = str;
+
+	while (*String) {
+		if (*String == '\n')
+			InternalSendCharToSerialFy('\r');
+		InternalSendCharToSerialFy(*(String++));
+	}
+}
+
 // pit
 #define PIT_FREQUENCY     1193182
 #define PIT_PORT_COMMAND  0x43
@@ -2037,6 +2056,9 @@ FatFile InternalExtendedFindFile(char* path)
     return fileNull; // no encontrado
 }
 KernelStatus InternalRunBinary(void* buffer, int size, KernelServices* Services) {
+	// depurar
+	InternalDebug("[SysInternal]     Cargando programa\n");	
+
 	// incrementar nivel de privilegios
 	InternalRingLevel++;
 
@@ -2048,6 +2070,9 @@ KernelStatus InternalRunBinary(void* buffer, int size, KernelServices* Services)
 	// longitud anterior del programa
 	int OldSizeProgram = ProgramMainSize;
 
+	// depurar
+	InternalDebug("[SysInternal]     Verificando pila de programas y ejecucion para apilar\n");	
+
 	// si ya esta en un programa
 	if (MemoryCurrentSystem == MemAllocTypePrograms) MakePagingEmulator = 1;
 
@@ -2057,11 +2082,20 @@ KernelStatus InternalRunBinary(void* buffer, int size, KernelServices* Services)
 	// si se va a hacer paginacion
 	if (MakePagingEmulator) 
 	{
+		// depurar
+		InternalDebug("[SysInternal]     Se necesita copiar el programa a la pila de usuario\n");	
+
 		// hacer paginacion
 		ProgramDataAndThings = (uint8_t*)InternalAllocatePool(OldSizeProgram, MemAllocTypeProgramsStackMemory);
+		
+		// depurar
+		InternalDebug("[SysInternal]     Pila creada\n");	
 
 		// copiar
 		InternalMemoryCopy(ProgramDataAndThings, USER_LOAD_ADDR, OldSizeProgram);
+
+		// depurar
+		InternalDebug("[SysInternal]     Programa anterior guardado con exito\n");	
 	}
 
 	// la longitud
@@ -2088,14 +2122,23 @@ KernelStatus InternalRunBinary(void* buffer, int size, KernelServices* Services)
 	// si es menor el tamaño
     if (size < sizeof(UserHeader)) return KerneLStatusThingVerySmall;
 
+	// depurar
+	InternalDebug("[SysInternal]     Copiando programa a la memoria\n");	
+
 	// copiar al user load address el buffer
     InternalMemoryCopy(USER_LOAD_ADDR, buffer, size);
 
 	// el header
     UserHeader* hdr = (UserHeader*)USER_LOAD_ADDR;
 
+	// depurar
+	InternalDebug("[SysInternal]     Verificando header...\n");	
+
 	// parametro invalido
     if (Services->Memory->CompareMemory(hdr->magic, "ModuBin", 7) != 0) return KernelStatusInvalidParam;
+
+	// depurar
+	InternalDebug("[SysInternal]     Verificando bss...\n");	
 
 	// si es mayor el end que el start
     if (hdr->bss_end > hdr->bss_start) {
@@ -2104,6 +2147,9 @@ KernelStatus InternalRunBinary(void* buffer, int size, KernelServices* Services)
 		// setear memoria
         InternalMemorySet((void*)hdr->bss_start, 0, bss_size);
     }
+
+	// depurar
+	InternalDebug("[SysInternal]     Ejecutando programa...\n");	
 
 	// el tipo de programa
     typedef KernelStatus (*ProgramEntry)(KernelServices*);
@@ -2123,15 +2169,30 @@ KernelStatus InternalRunBinary(void* buffer, int size, KernelServices* Services)
 	// regresarlo
 	if (MakePagingEmulator) 
 	{
+		// depurar
+		InternalDebug("[SysInternal]    Cargando programa anterior...\n");	
+
 		// copiarlo de nuevo
 		InternalMemoryCopy(USER_LOAD_ADDR, ProgramDataAndThings, OldSizeProgram);
 	
 		// liberarlo
 		FreePool(ProgramDataAndThings);
+
+		// depurar
+		InternalDebug("[SysInternal]     Cargado con exito...\n");	
 	}
 
 	// decrementar nivel de privilegios
 	InternalRingLevel--;
+
+	// depurar
+	InternalDebug("[SysInternal]     Programa terminado con status: ");	
+
+	char serialStatus[30];
+
+	IntToString2Digits(Status, serialStatus);
+	InternalDebug(serialStatus);	
+	InternalDebug("\n");	
 
 	// retornar el status
     return Status;
@@ -2944,6 +3005,11 @@ KernelStatus InternalMiniKernelProgram(KernelServices* Services)
 }
 void k_main() 
 { 
+	InternalDebug("ModuKernel Debug Console\n\nBienvenido a la consola de desarrollo de tu kernel basado en ModuKernel, aqui veras las noticias que mande tu sistema operativo en tiempo real, puede tambien proximamente mandar acciones al kernel y interrumpir\n");
+
+	// debuggear
+	InternalDebug("[SysInternal]     ModuKernel ha entrado en C\n");
+
 	// etapa de arranque prematura aqui se inicializan los servicios basicos
 	// mas no los servicios del kernel donde se iniciaran prototipadamente
 
@@ -2953,8 +3019,14 @@ void k_main()
 	// memoria actual
 	MemoryCurrentSystem = MemAllocTypeKernelServices;
 
+	// debuggear
+	InternalDebug("[SysInternal]     Inicializando Heap...\n");
+
 	// inicializar heap para AllocatePool y FreePool
 	InitHeap();
+
+	// debuggear
+	InternalDebug("[SysInternal]     Inicializando Servicios...\n");
 
 	// los servicios
     KernelServices Services;
@@ -2965,6 +3037,9 @@ void k_main()
 	// etapa de arranque silencioso aqui se seleccionan diferentes configuraciones
 	// y otras cosas para poder inicializar los servicios de manera compleja, como
 	// la pantalla
+
+	// debuggear
+	InternalDebug("[SysInternal]     Inicializando Pantalla...\n");
 
 	// setear el servicio acutal de la pantalla
     Services.Display->Set(Services.Display);
@@ -2984,6 +3059,9 @@ void k_main()
 	Services.Time->TaskDelay(20);
 	Services.Music->Mute();
 
+	// debuggear
+	InternalDebug("[SysInternal]     Empezando a arrancar\n");
+
 	// imprimir la promocion
 	Services.Display->printg("ErickCraftStudios ModuKernel (Operating System)\n\n");
 	Services.Display->printg("powered By ModuKernel - https://github.com/ErickStudios/ModuKernel\n\n");
@@ -3000,6 +3078,9 @@ void k_main()
 	// esto no es otra etapa de arranque, sigue siendo la etapa de arranque normal
 	// aunque aqui se hace una animacion para que no se vea muy cutre, recuerden, pueden
 	// personalizarla si se basan en el kernel
+
+	// debuggear
+	InternalDebug("[SysInternal]     Mostrando logo...\n");
 
 	char interrupted = 0;
 
@@ -3050,6 +3131,10 @@ void k_main()
 		// si ya recorrio el logo volver al inicio
 		if (IndexZone > LogoLen) IndexZone = 0;
 	}	
+
+	// debuggear
+	InternalDebug("[SysInternal]     Kernel Cargado\n");
+	InternalDebug("*** logs de modo usuario ***\n");
 
 	// etapa de usuario esta no es una etapa de arranque si no la recta final pero
 	// aqui el usuario ya tiene control completo del sistema y ya el sistema esta totalmente
@@ -3205,8 +3290,6 @@ void InternalPrintgNonLine(char *message)
 
 		while (message[letter])
 		{
-			InternalSendCharToSerial(message[letter]);
-
 			if (line >= 32) {
 				char* vidmem = (char *)0xA0000;
 				InternalMemMove(vidmem, vidmem + (320 * 4), 320*200);
@@ -3244,8 +3327,6 @@ void InternalPrintgNonLine(char *message)
 
 		while (*message != 0)
 		{
-			InternalSendCharToSerial(message[0]);
-
 			if (*message == '\n' || column >= 80)
 			{
 				line++;

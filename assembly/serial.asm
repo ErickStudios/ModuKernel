@@ -20,34 +20,22 @@ init_serial:
 
 ; enviar un caracter al puerto serial
 InternalSendCharToSerial:
-	; guardarlo para despues recuperarlo
-	push eax				; el argumento
-	push dx					; el registro
+    push dx                ; salvar dx
 
-    ; obtener argumento desde la pila
-    mov eax, [esp+4]   		; primer argumento
+    mov al, [esp+6]        ; obtener argumento (char ch)
+    mov bl, al             ; guardar en BL para no perderlo
 
-	; guardar al
-	movzx eax, al			; extension
-	push eax				; guardar
-
-    ; espera a que el transmisor esté listo
-    mov dx, 0x3F8+5   	 	; Line Status Register
-
-	; si esta listo?
-	.waita:
-    	in al, dx			; leerlo
-    	test al, 0x20		; probarlo
-    	jz .waita			; si no no se puede
+    ; esperar transmisor listo
+    mov dx, 0x3F8+5
+.waita:
+    in  al, dx
+    test al, 0x20
+    jz .waita
 
     ; enviar carácter
-    mov dx, 0x3F8			; registro de serial
-	pop eax        			; recupera 32 bits
-	mov al, al     			; ya está en la parte baja de eax
-    out dx, al				; mandarlo
+    mov dx, 0x3F8
+    mov al, bl             ; recuperar el carácter original
+    out dx, al
 
-	pop dx					; el registro
-	pop eax					; el argumento
-
+    pop dx
     ret
-
