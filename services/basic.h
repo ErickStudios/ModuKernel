@@ -14,6 +14,8 @@ enum _ModuAllocType;
 typedef void* ObjectAny;
 // el tipo de booleano
 typedef uint8_t bool;
+// funcion
+typedef void function;
 // el tipo de memoria y byte de array
 typedef uint8_t* bytes;
 #endif

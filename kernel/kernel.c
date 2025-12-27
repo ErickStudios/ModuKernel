@@ -21,41 +21,49 @@
 // servicios globales
 KernelServices* GlobalServices;
 // mayusculas y minusculas
-char LowerUpper = 0;
+bool LowerUpper = 0;
 // version del sistema
-int InternalServicesVersion = 20;
+uint32_t InternalServicesVersion = 26;
 
 // parametros
-void** InternalParams;
-int InternalParamsCount;
+function** InternalParams;
+int32_t InternalParamsCount;
 
 // archivo de shell y directorio
 char CurrentWorkDirectory[128] = "/";
-unsigned int CwdCurrentCharacter = 1;
-int CwdLevelDir = 1;
+uint32_t CwdCurrentCharacter = 1;
+int32_t CwdLevelDir = 1;
 
 // el tamaño del programa
-int ProgramMainSize = 0;
+int32_t ProgramMainSize = 0;
 
 // pools del kernel
 KernelPool* heap_start = (KernelPool*)&_heap_start;
 KernelPool* free_list = NULL;
 
+// gdts
+struct GDTEntry gdt[3];
+struct GDTPtr gdt_ptr;
+extern struct GDTPtr gdt_ptr;
+
+// assembly variables
 extern uint8_t InternalGrapichalFlag;
-extern void config_mode();
-extern void unconfig_mode();
-extern void InternalDrawBackground(uint8_t Color);
-extern void InternalGopScreenInit();
-extern void InternalSendCharToSerial(char ch);
-extern void InternalKernelHaltReal();
+extern uint8_t InternalBStg;
+extern uint8_t InternalBStgG;
+extern uint32_t InternalRingLevel;
+
+// assembly funciones
+extern function config_mode();
+extern function unconfig_mode();
+extern function InternalDrawBackground(uint8_t Color);
+extern function InternalGopScreenInit();
+extern function InternalSendCharToSerial(char ch);
+extern function InternalKernelHaltReal();
+
+// pit
 #define PIT_FREQUENCY     1193182
 #define PIT_PORT_COMMAND  0x43
 #define PIT_PORT_CHANNEL0 0x40
-
-struct GDTEntry gdt[3];
-struct GDTPtr gdt_ptr;
-
-extern struct GDTPtr gdt_ptr;
 
 void init_gdt() {
     gdt_ptr.limit = (sizeof(gdt) - 1);
@@ -80,8 +88,6 @@ void init_gdt() {
     gdt[2].granularity  = 0xCF;
     gdt[2].base_high    = 0x00;
 }
-
-
 void pit_init(uint32_t freq) {
     uint16_t divisor = (uint16_t)(PIT_FREQUENCY / freq);
 
@@ -1896,6 +1902,7 @@ void InitializeKernel(KernelServices* Services)
 	Services->Misc->ParamsCount=&InternalParamsCount;
 	Services->Misc->GetTicks  = &InternalGetNumberOfTicksFromMachineStart;
 	Services->Misc->Throw 	  = &InternalModuPanic;
+	Services->Misc->Halt	  = &InternalKernelHalt;
     Services->ServicesVersion = &InternalServicesVersion;
 
     // pantalla
@@ -2030,6 +2037,9 @@ FatFile InternalExtendedFindFile(char* path)
     return fileNull; // no encontrado
 }
 KernelStatus InternalRunBinary(void* buffer, int size, KernelServices* Services) {
+	// incrementar nivel de privilegios
+	InternalRingLevel++;
+
 	// datos y cosas
 	uint8_t* ProgramDataAndThings = 0;
 	// si hacer paginacion
@@ -2120,8 +2130,91 @@ KernelStatus InternalRunBinary(void* buffer, int size, KernelServices* Services)
 		FreePool(ProgramDataAndThings);
 	}
 
+	// decrementar nivel de privilegios
+	InternalRingLevel--;
+
 	// retornar el status
     return Status;
+}
+void InternalExecuteScript(char* buffer)
+{
+	int StackI[100];
+	int StackLine = 0;
+
+	char* text = (char*)buffer;
+	char* parts[512];
+    int n = StrSplit(text, parts, '\n');
+    for (int i = 0; i < n; i++) 
+	{
+		char* Line = StrTrim(parts[i]);
+
+		if (StrnCmp(Line, "call ", 5) == 0)
+		{
+			char* Function = Line + 5;
+			int NewLen = (sizeof(char) * (StrLen(Function) + 2));
+
+			char* fnline = AllocatePool(NewLen);
+
+			InternalMemoryCopy(fnline, Function, NewLen);
+
+			fnline[NewLen - 1] = 0;
+			fnline[NewLen - 2] = ':';
+
+			bool Founded = 0;
+			int LineIn = 0;
+
+			for (size_t j = 0; j < n; j++)
+			{
+				char* Line2 = StrTrim(parts[j]);
+
+				if (StrCmp(Line2, fnline) == 0)
+				{
+					Founded = 1;
+					LineIn = j;
+				}
+			}
+
+			if (Founded)
+			{
+				int OldLine = i;
+				StackI[StackLine++] = OldLine;
+				i = LineIn;
+			}
+		}
+		else if (StrnCmp(Line, "jmp ", 4) == 0)
+		{
+			char* Function = Line + 4;
+			int NewLen = (sizeof(char) * (StrLen(Function) + 2));
+
+			char* fnline = AllocatePool(NewLen);
+
+			InternalMemoryCopy(fnline, Function, NewLen);
+
+			fnline[NewLen - 1] = 0;
+			fnline[NewLen - 2] = ':';
+
+			bool Founded = 0;
+			int LineIn = 0;
+
+			for (size_t j = 0; j < n; j++)
+			{
+				char* Line2 = StrTrim(parts[j]);
+
+				if (StrCmp(Line2, fnline) == 0)
+				{
+					Founded = 1;
+					LineIn = j;
+				}
+			}
+
+			if (Founded)
+			{
+				i = LineIn;
+			}
+		}
+		else if (StrCmp(Line, "ret") == 0) i = StackI[StackLine--];
+		else InternalSysCommandExecute(GlobalServices, Line, 0);
+	}
 }
 void InternalDumpHexMemory(void* buffer, size_t size) {
     uint8_t* data = (uint8_t*)buffer;
@@ -2406,6 +2499,10 @@ void InternalSysCommandExecute(KernelServices* Services, char* command, int lena
 	}
 	else if (StrnCmp(command, "modush ", 7) == 0)
 	{
+
+		// incrementar nivel de privilegios
+		InternalRingLevel++;
+
 		char* shell_file =command + 7;
 		void* buffer = NULL; int size = 0;
 
@@ -2422,12 +2519,12 @@ void InternalSysCommandExecute(KernelServices* Services, char* command, int lena
         KernelStatus status = Services->File->GetFile(file, &buffer, &size);
 
         if (!_StatusError(status)) {
-			char* text = (char*)buffer; text[file.sector.file_size] = 0; char* parts[120];
-            int n = StrSplit(text, parts, '\n');
-            for (int i = 0; i < n; i++) Services->Misc->Run(Services, parts[i], 0);
-           	Services->Memory->FreePool(buffer);
-			return;
+			char* text = (char*)buffer; text[file.sector.file_size] = 0;
+			InternalExecuteScript(text);
 		}
+
+		// decrementar nivel de privilegios
+		InternalRingLevel--;
 
 		Services->Memory->FreePool(buffer);
 		Services->Display->printg("no se pudo ejecutar");
@@ -2713,6 +2810,16 @@ void InternalSysCommandExecute(KernelServices* Services, char* command, int lena
 	else if (StrCmp(command, "ugrm") == 0) unconfig_mode();
 	else if (StrCmp(command, "grm") == 0) config_mode();
 	else if (StrCmp(command, "shell") == 0) InternalMiniKernelProgram(Services);
+	else if (StrCmp(command, "ulr") == 0) 
+	{
+		char esb[30];
+		UIntToString(InternalRingLevel, esb);
+
+		if (InternalRingLevel < 2) Services->Display->printg("In-C env");
+		else if (InternalRingLevel == 0) Services->Display->printg("Assembly (Post-C) env");
+		else Services->Display->printg(esb);
+		Services->Display->printg("\n");
+	}
 	else if (StrCmp(command , "map") == 0)
 	{
 		Services->Display->printg("HDA:   (Hard Disk)\n");

@@ -238,4 +238,15 @@ void IntToHexString(unsigned int value, char* buffer) {
     buffer[j] = '\0';
 }
 
+char* StrTrim(char* str) {
+    char* stra = str;
+
+    while (*stra) {
+        if (*stra == ' ' || *stra == '\t')
+            stra++;
+        else
+            return stra;
+    }
+    return stra; // si toda la cadena eran espacios, devuelve el '\0'
+}
 #endif

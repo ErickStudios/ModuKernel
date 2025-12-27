@@ -70,6 +70,8 @@ typedef void (*KernelServicesGetTimeDate)(KernelDateTime* Time);
 typedef unsigned long long (*KernelServicesGetTicks)();
 /* el tipo para hacer un panic */
 typedef void (*KernelServicesThrow)(KernelStatus Status);
+/* el tipo para haltear el cpu */
+typedef void (*KernelServicesHalt)();
 /* el tipo de servicios otros */
 typedef struct _KernelMiscServices {
     /* funcion para ejecutar un comando desde la shell, requiere como 
@@ -100,6 +102,8 @@ typedef struct _KernelMiscServices {
     /* lanza un error a nivel de kernel si es necesario no te preocupes en
     usarlo el usuario puede presionar enter para continuar */
     KernelServicesThrow Throw;
+    /* funcion para haltear el CPU */
+    KernelServicesHalt Halt;
 } KernelMiscServices;
 /* esta estructura contiene la tabla de servicios del kernel 
 para que sea mas comprensible , organizado y facil de usar */

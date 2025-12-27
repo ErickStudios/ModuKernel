@@ -198,13 +198,21 @@ void DrawDesktop(struct _DesktopContext* Desktop, struct _MouseState* Mouse)
 
                 gDS->setAttrs(0x7, 0x0);
 
+                gDS->Blt(
+                    6, 
+                    ((gDS->CurrentCharacter * 5)) + 2, 
+                    ((gDS->CurrentLine+1) * 8) - 1,
+                    (StrLen(Text) * 5),
+                    1
+                );
+                
                 if (
                     (((Mouse->x) > (gDS->CurrentCharacter * 5)) && 
                     ((Mouse->x) < ((gDS->CurrentCharacter * 5) + (StrLen(TextA) * 5)))) &&
                     ((Mouse->y > (gDS->CurrentLine * 8)) && Mouse->y < ((gDS->CurrentLine+1) * 8))
                 )
                     gDS->setAttrs(0x0, 0x7);
-                
+
                 gDS->printg(TextA);
                 gDS->CurrentCharacter = PosX;
                 gDS->CurrentLine++;
