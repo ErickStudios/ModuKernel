@@ -27,7 +27,7 @@ typedef enum _KernelStatus {
     /* el parametro que se mando fue uno que no es valido */
     KernelStatusInvalidParam,
     /* si algo es muy pequeño para ser usado o cargado */
-    KerneLStatusThingVerySmall,
+    KernelStatusThingVerySmall,
     /* si el dispositivo esta opcupado */
     KernelStatusDeviceBusy
 } KernelStatus;

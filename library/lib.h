@@ -1,3 +1,5 @@
+#ifndef _ModuKernelBaseLibrary_
+#define _ModuKernelBaseLibrary_
 // libreria
 #include <stdint.h>
 #include "../services/KernelServices.h"
@@ -72,3 +74,21 @@ void InitializeLibrary(Sys* System)
     gIOS = System->InputOutput;
     gMS = System->Memory;
 }
+
+char* AllocateStringArray(char* text)
+{
+    size_t len = StrLen(text) + 1; // incluye el '\0'
+
+    char* retval = gMS->AllocatePool(len);
+    if (!retval) {
+        return 0; // manejo de error si no hay memoria
+    }
+
+    gMS->CoppyMemory(retval, text, len);
+
+    return retval;
+}
+
+#include "status.h"
+
+#endif
