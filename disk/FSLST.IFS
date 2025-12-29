@@ -4,6 +4,8 @@
 /bin/helloworld;BC3;BIN;
 /bin/mouse;BC4;BIN;
 /bin/multi;BC5;BIN;
+/kernel/init;AC0;BIN;
+/kernel/modush;AC1;BIN;
 /dev/drv0;DV0;BIN;
 /sys/help;SY0;BIN;
 /sys/frcache.sh;SH0;NSH;

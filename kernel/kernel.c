@@ -2146,7 +2146,6 @@ void InternalSysCommandExecute(KernelServices* Services, char* command, int lena
 	}
 	else if (StrCmp(command, "ugrm") == 0) unconfig_mode();
 	else if (StrCmp(command, "grm") == 0) config_mode();
-	else if (StrCmp(command, "shell") == 0) InternalMiniKernelProgram(Services);
 	else if (StrCmp(command, "ulr") == 0) 
 	{
 		char esb[30];
@@ -2245,22 +2244,6 @@ void InternalSysCommandExecute(KernelServices* Services, char* command, int lena
         Services->Display->printg("no se pudo leer archivo\n");
 	}
 }
-KernelStatus InternalMiniKernelProgram(KernelServices* Services)
-{
-	// mensajes
-	Services->Display->printg("Welcome to ModuKernel!\n");
-
-	for (;;) {
-		Services->Misc->Run(Services, "prp", 0);
-		char* Prompt = Services->InputOutput->ReadLine();
-
-		if (StrCmp(Prompt, "exit") == 0) return;
-
-		Services->Display->printg("\n");
-		Services->Misc->Run(Services, Prompt, 0);
-		Services->Memory->FreePool(Prompt);
-	}
-}
 void k_main() 
 { 
 	InternalDebug("ModuKernel Debug Console\n\nBienvenido a la consola de desarrollo de tu kernel basado en ModuKernel, aqui veras las noticias que mande tu sistema operativo en tiempo real, puede tambien proximamente mandar acciones al kernel y interrumpir\n");
@@ -2341,86 +2324,26 @@ void k_main()
 	// aunque aqui se hace una animacion para que no se vea muy cutre, recuerden, pueden
 	// personalizarla si se basan en el kernel
 
-	// debuggear
-	SystemInternalMessage("Mostrando logo...");
+	InternalRingLevel -= 2;
 
-	char interrupted = 0;
+	// archivo init
+	FatFile InitFile = Services.File->OpenFile("/kernel/init");
+	// contenido
+	ObjectAny InitCode; 
+	// tamaño
+	int32_t InitSize;
+	// abrir
+	KernelStatus OpenInit = Services.File->GetFile(InitFile, &InitCode, &InitSize);
 
-	// zona
-	int IndexZone = 0;
-	// logo
-	char LogoABC[] = "ModuKernel";
-	// logo para operaciones
-	char* LogoABCForOperations = LogoABC;
-	// longitud
-	int LogoLen = StrLen(LogoABCForOperations);
+	// si salio bien
+	if (!_StatusError(OpenInit)) Services.Misc->RunBinary(InitCode, InitSize, &Services);
 
-	// mostrar logo
-	for (int ab = 0; ab < (LogoLen * 5); ab++)
-	{
-		char Key = Services.InputOutput->ReadKey();
+	// liberar
+	Services.Memory->FreePool(InitCode);
+	Services.File->CloseFile(InitFile);
 
-		if (Key == 'c' || Key == 'C') 
-		{
-			interrupted = 1;
-			break;
-		}
-
-		// setear linea actual
-
-		Services.Display->CurrentLine = 12;
-		Services.Display->CurrentCharacter = 70;
-
-		// mostrar logo
-		for (int i = 0; i < LogoLen; i++)
-		{
-			// si esta cerca pero no en la zona ,color cyan
-			if (i == (IndexZone-1) || i == (IndexZone+1)) Services.Display->setAttrs(0, 3);
-			// si esta en la zona ,color verde
-			else if (i == IndexZone) Services.Display->setAttrs(0, 2);
-			// si no esta en el rango ,color gris
-			else Services.Display->setAttrs(0, 7);
-
-			// escritura
-			char Wrt[2] = { LogoABCForOperations[i], 0 }; Services.Display->printg(Wrt);
-		}		
-
-		// esperar
-		Services.Time->TaskDelay(2);
-
-		// sumar zona
-		IndexZone++;
-		// si ya recorrio el logo volver al inicio
-		if (IndexZone > LogoLen) IndexZone = 0;
-	}	
-
-	// debuggear
-	SystemInternalMessage("Kernel Cargado");
-	InternalDebug("\x1B[96m--- *** logs de modo usuario *** ---\x1B[0m\n\n");
-
-	// etapa de usuario esta no es una etapa de arranque si no la recta final pero
-	// aqui el usuario ya tiene control completo del sistema y ya el sistema esta totalmente
-	// despierto, asi que lanza la shell por que si no que mas lanzar, recuerden que pueden
-	// personalizar su mini programa
-
-	// tipo de memoria del sistema
-	MemoryCurrentSystem = MemAllocTypeSystem;
-
-	Services.Display->printg("\n\n");
-	if (interrupted == 1);
-	else
-	{
-		FatFile DesktopFile = Services.File->OpenFile("/bin/desktop");
-
-		void* content; int size;
-		KernelStatus Status = Services.File->GetFile(DesktopFile, &content, &size);
-
-		if (!_StatusError(Status)) Services.Misc->RunBinary(content, size, &Services);
-
-		Services.Memory->FreePool(content);
-	}
-
-	InternalMiniKernelProgram(&Services);
+	// ahora que hacemos si no esta
+	if (_StatusError(OpenInit)) Services.Misc->Throw(KernelStatusNotFound);
 }
 KernelStatus ProcessCrtByFile(char* name, char* ext, KernelServices* Services)
 {

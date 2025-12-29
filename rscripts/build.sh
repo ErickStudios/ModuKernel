@@ -12,12 +12,15 @@ compile_raw() {
     rm -f temp.o
 }
 
-mkdir -p build disk
+mkdir -p build
 
 # Kernel
 nasm -f elf32 assembly/kernel.asm -o build/kasm.o
 gcc -m32 -ffreestanding -fno-stack-protector -nostdlib -c kernel/kernel.c -o build/kc.o
 ld -m elf_i386 -T ABI/kernel_link.ld -o build/kernel build/kasm.o build/kc.o
+
+cd modules
+source build.sh
 
 # FS map
 rm -rf disk/*
@@ -28,6 +31,14 @@ for file in programs/*.c; do
     nameq=$(basename "$file"); name="${nameq%.*}"
     compile_raw "$file" "disk/BC$afaf.BIN"
     echo "/bin/$name;BC$afaf;BIN;" >> disk/FSLST.IFS
+    let afaf=afaf+1
+done
+
+afaf=0
+for file in build/modules/*.modubin; do
+    nameq=$(basename "$file"); name="${nameq%.*}"
+    cp "$file" "disk/AC$afaf.BIN"
+    echo "/kernel/$name;AC$afaf;BIN;" >> disk/FSLST.IFS
     let afaf=afaf+1
 done
 
