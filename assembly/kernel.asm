@@ -29,6 +29,9 @@ section .text
 ; variables
 extern gdt_ptr					; puntero al gdt
 
+; llamadas
+%include "handlers/syscall.asm"
+
 ; exportaciones
 %include "assembly/exports/boot.asm"; arranque
 %include "assembly/exports/gop.asm";graficos

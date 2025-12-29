@@ -4,6 +4,8 @@
 /bin/helloworld;BC3;BIN;
 /bin/mouse;BC4;BIN;
 /bin/multi;BC5;BIN;
+/bin/trivia;BC6;BIN;
+/bin/triviafile;BC7;BIN;
 /kernel/init;AC0;BIN;
 /kernel/modush;AC1;BIN;
 /dev/drv0;DV0;BIN;

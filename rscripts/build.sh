@@ -12,6 +12,15 @@ compile_raw() {
     rm -f temp.o
 }
 
+compile_asm()
+{
+    local src="$1"
+    local out="$2"
+
+    nasm -f elf32 "$src" -o build/tempa.o
+    ld -m elf_i386 -T ABI/user_link.ld --oformat binary build/tempa.o -o "$out"
+}
+
 mkdir -p build
 
 # Kernel
@@ -30,6 +39,13 @@ afaf=0
 for file in programs/*.c; do
     nameq=$(basename "$file"); name="${nameq%.*}"
     compile_raw "$file" "disk/BC$afaf.BIN"
+    echo "/bin/$name;BC$afaf;BIN;" >> disk/FSLST.IFS
+    let afaf=afaf+1
+done
+
+for file in programs/*.asm; do
+    nameq=$(basename "$file"); name="${nameq%.*}"
+    compile_asm "$file" "disk/BC$afaf.BIN"
     echo "/bin/$name;BC$afaf;BIN;" >> disk/FSLST.IFS
     let afaf=afaf+1
 done

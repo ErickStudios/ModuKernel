@@ -1,8 +1,8 @@
-global IdtExPageFault
-extern IdtExPageFaultHnd
+global IdtSystemCall
+extern IdtSystemCallHnd
 
-; handle para page fault
-IdtExPageFault:
+; handle para system call
+IdtSystemCall:
     ; guardar los registros
     pusha                           ; guardar todos los generales
     push ds                         ; guardar ds
@@ -12,7 +12,7 @@ IdtExPageFault:
 
     ; llamar al stub c
     push esp                        ; ponerlo
-    call IdtExPageFaultHnd          ; handler
+    call IdtSystemCallHnd           ; handler
     add esp, 4                      ; vaciar la pila
 
     ; recuperar

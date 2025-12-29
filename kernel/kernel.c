@@ -25,6 +25,7 @@ KernelServices* GlobalServices;
 #include "../services/headers/gdt.h"
 #include "../handlers/idt.h"
 #include "../handlers/exceptions.h"
+#include "../syscalls/syscall.h"
 
 // manejador de excepciones
 ObjectAny ExceptionHandlePtr;
@@ -94,6 +95,9 @@ void idt_init() {
 	set_idt_entry(4, (uint32_t)IdtExOverflow, 0x08, 0x8E);
 	// page fault
 	set_idt_entry(14, (uint32_t)IdtExPageFault, 0x08, 0x8E);
+
+	// llamadas
+	set_idt_entry(0x80, (uint32_t)IdtSystemCall, 0x08, 0x8E);
 
     // cargar IDT
     asm volatile("lidt %0" :: "m"(idt_ptr));
