@@ -5,6 +5,16 @@
 
 #include "../libc/String.h"
 
+static uint16_t inw(uint16_t port) {
+    uint16_t ret;
+    __asm__ __volatile__("inw %1, %0" : "=a"(ret) : "Nd"(port));
+    return ret;
+}
+static inline void outw(unsigned short port, unsigned short value)
+{
+    __asm__ __volatile__("outw %0, %1" : : "a"(value), "Nd"(port));
+}
+
 // el tipo de sistema
 typedef KernelServices Sys;
 
@@ -17,6 +27,8 @@ IoServices* gIOS;
 // variable independiente de Memoria
 MemoryServices* gMS;
 
+typedef unsigned long      size_t;
+
 typedef signed char        Mini;
 typedef short              Corto;
 typedef int                Entero;
@@ -25,6 +37,8 @@ typedef unsigned char      MiniPositivo;
 typedef unsigned short     CortoPositivo;
 typedef unsigned int       EnteroPositivo;
 typedef unsigned long long GrandePositivo;
+
+typedef unsigned int       DriverDataIo;
 
 typedef char*               string;
 
@@ -38,6 +52,8 @@ typedef GrandePositivo     DireccionAValor;
 #define EscaneoFlechaAbajo KernelSimpleIoSpecKey(2)
 #define EscaneoFlechaIzquierda KernelSimpleIoSpecKey(3)
 #define EscaneoFlechaDerecha KernelSimpleIoSpecKey(4)
+
+#define DriverFooterFunctions asm volatile(".long 0xffaa12bb");
 
 // para funciones rapidas
 #define GetArgs(Services,Count)                                             \

@@ -39,6 +39,7 @@ typedef struct {
 typedef struct _FatFile {
     struct _FAT12_BootSector* bs;
     struct _FAT12_DirEntry sector;
+    struct _FAT12_DirEntry* dir;
 } FatFile;
 
 unsigned short get_fat_entry(unsigned short cluster, unsigned char* fat) {
@@ -70,4 +71,3 @@ FileAddress InternalFat12GetFileIndex(FatFile File)
 
     return addr;
 }
-

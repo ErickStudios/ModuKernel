@@ -15,7 +15,11 @@ static uint8_t inb(uint16_t port) {
 static void outb(uint16_t port, uint8_t val) {
     __asm__ __volatile__("outb %0, %1" : : "a"(val), "dN"(port));
 }
-
+static uint16_t inw(uint16_t port) {
+    uint16_t ret;
+    __asm__ __volatile__("inw %1, %0" : "=a"(ret) : "Nd"(port));
+    return ret;
+}
 static inline void outw(unsigned short port, unsigned short value)
 {
     __asm__ __volatile__("outw %0, %1" : : "a"(value), "Nd"(port));
@@ -27,12 +31,6 @@ void IntToString2Digits(int value, char* out) {
 }
 
 unsigned long long InternalGetNumberOfTicksFromMachineStart();
-
-static uint16_t inw(uint16_t port) {
-    uint16_t ret;
-    __asm__ __volatile__("inw %1, %0" : "=a"(ret) : "Nd"(port));
-    return ret;
-}
 
 char* InternalReadLine();
 

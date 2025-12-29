@@ -19,6 +19,7 @@ KernelStatus ErickMain(KernelServices* Services)
     {
         Services->Misc->RunBinary(content, size, Services);
         Services->Memory->FreePool(content);
+        Services->File->CloseFile(OtherFile);
     }
     else 
     {

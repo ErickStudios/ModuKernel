@@ -18,6 +18,8 @@ typedef enum _KernelStatus (*KernelSimpleDiskExecuteFile)(char* name, char* ext,
 typedef enum _KernelStatus (*KernelSimpleDiskReadSector)(unsigned int lba, unsigned char* buffer);
 /* para usar el tipo de directorios extendidos */
 typedef struct _FatFile (*KernelSimpleDiskOpen)(char* path);
+/* para cerrar un archivo */
+typedef void (*KernelSimpleDiskCloseFile)(struct _FatFile File);
 /* servicios de disco */
 typedef struct _DiskServices {
     /* funcion para ejecutar un archivo, esta funcion requiere
@@ -53,5 +55,7 @@ typedef struct _DiskServices {
     KernelSimpleDiskOpen OpenFile;
     /* puntero al tipo de disco actual del sistema */
     DiskTypePort* CurrentDiskType;
+    /* para cerrar el archivo */
+    KernelSimpleDiskCloseFile CloseFile;
 } DiskServices;
 #endif

@@ -4,6 +4,8 @@
 // esto
 KernelStatus ErickMain(KernelServices* Serv)
 {
+    InitializeLibrary(Serv);
+
     // obtener argumentos
     GetArgs(Serv, count);
     // ejecucion

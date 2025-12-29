@@ -42,9 +42,10 @@ KernelPool* heap_start = (KernelPool*)&_heap_start;
 KernelPool* free_list = NULL;
 
 // gdts
-struct GDTEntry gdt[3];
+struct GDTEntry gdt[23];
 struct GDTPtr gdt_ptr;
 extern struct GDTPtr gdt_ptr;
+uint32_t GdtSetProtectRegion = 3;
 
 // assembly variables
 extern uint8_t InternalGrapichalFlag;
@@ -68,6 +69,38 @@ void InternalSendCharToSerialFy(char ch) {
     outb(0x3F8, (uint8_t)ch);
 }
 
+void set_gdt_entry(int num, uint32_t base, uint32_t limit, uint8_t access, uint8_t gran)
+{
+    gdt[num].base_low    = (base & 0xFFFF);
+    gdt[num].base_middle = (base >> 16) & 0xFF;
+    gdt[num].base_high   = (base >> 24) & 0xFF;
+
+    gdt[num].limit_low   = (limit & 0xFFFF);
+    gdt[num].granularity = (limit >> 16) & 0x0F;
+
+    gdt[num].granularity |= (gran & 0xF0);
+    gdt[num].access      = access;
+}
+
+void InternalProtectRegion(void* ptr, uint32_t size, enum GdtLevelIn level)
+{
+    uint32_t base  = (uint32_t)ptr;
+    uint32_t limit = size - 1;
+
+    uint8_t access;
+    if (level == GdtLevelInRing0) {
+        // Datos RW, presente, ring 0
+        access = 0x92;
+    } else {
+        // Datos RW, presente, ring 3
+        access = 0xF2;
+    }
+
+    uint8_t gran = 0xCF; // 4KB granularity, 32-bit
+
+    set_gdt_entry(GdtSetProtectRegion++ , base, limit, access, gran);
+}
+
 void InternalDebug(char* str)
 {
 	char* String = str;
@@ -84,6 +117,12 @@ void InternalDebug(char* str)
 #define PIT_PORT_COMMAND  0x43
 #define PIT_PORT_CHANNEL0 0x40
 
+void SystemInternalMessage(char* msg)
+{
+	InternalDebug("\x1B[94m[  \x1B[92mSysInternal  \x1B[94m]     \x1B[0m");
+	InternalDebug(msg);
+	InternalDebug("\n");
+}
 void init_gdt() {
     gdt_ptr.limit = (sizeof(gdt) - 1);
     gdt_ptr.base  = (uint32_t)&gdt;
@@ -107,6 +146,7 @@ void init_gdt() {
     gdt[2].granularity  = 0xCF;
     gdt[2].base_high    = 0x00;
 }
+
 void pit_init(uint32_t freq) {
     uint16_t divisor = (uint16_t)(PIT_FREQUENCY / freq);
 
@@ -1405,6 +1445,11 @@ KernelStatus InternalDiskReadSector(unsigned int lba, unsigned char* buffer)
 {
 	InternalRealDiskReadSector(lba, buffer, SystemCwkDisk);
 }
+void InternalCloseFile(FatFile File)
+{
+	FreePool(File.dir);
+	FreePool(File.bs);
+}
 FatFile InternalDiskFindFile(char* name, char* ext) 
 {
 	// sector
@@ -1415,7 +1460,7 @@ FatFile InternalDiskFindFile(char* name, char* ext)
 	// estructura
     struct _FAT12_BootSector* bs_local = (struct _FAT12_BootSector*) sector0;
 
-    // Copia el boot sector a heap (memoria persistente)
+	// Copia el boot sector a heap (memoria persistente)
     struct _FAT12_BootSector* bs = (struct _FAT12_BootSector*) AllocatePool(sizeof(*bs));
     if (!bs) {
 		// vacio
@@ -1460,6 +1505,8 @@ FatFile InternalDiskFindFile(char* name, char* ext)
             File.bs = bs; 
 			// sector
             File.sector = dir[i];
+			// dir
+			File.dir = dir;
             // retornarlo
             return File;
         }
@@ -1959,6 +2006,7 @@ void InitializeKernel(KernelServices* Services)
 	Mem->GetFreeHeap  = &InternalGetFreeHeapSpace;
 	Mem->MallocType	  = &MemoryCurrentSystem;
 	Mem->RepairMemory = &InternalSleepDream;
+	Mem->MemorySet	  = &InternalMemorySet;
 
     // disco
     Dsk->RunFile    	= &ProcessCrtByFile;
@@ -1966,6 +2014,7 @@ void InitializeKernel(KernelServices* Services)
     Dsk->GetFile    	= &InternalDiskGetFile;
     Dsk->ReadSector 	= &InternalDiskReadSector;
 	Dsk->OpenFile 		= &InternalExtendedFindFile;
+	Dsk->CloseFile		= &InternalCloseFile;
 
 	Dsk->CurrentDiskType= &SystemCwkDisk;
 
@@ -2024,7 +2073,17 @@ FatFile InternalExtendedFindFile(char* path)
                 char ext[4]; InternalMemorySet(ext, ' ', 3); ext[3] = '\0';
                 for (int j = 0; j < StrLen(extRaw) && j < 3; j++) ext[j] = extRaw[j];
 
-                return GlobalServices->File->FindFile(name, ext);
+				char* nm = AllocatePool(sizeof(char) * 9);
+				char* xt = AllocatePool(sizeof(char) * 4);
+				InternalMemoryCopy(nm, name, (sizeof(char) * 9));
+				InternalMemoryCopy(xt, ext, (sizeof(char) * 4));
+
+        		GlobalServices->Memory->FreePool(buffer);
+				FatFile FileFinded = GlobalServices->File->FindFile(nm, xt);
+
+				FreePool(nm);
+				FreePool(xt);
+				return FileFinded;
             }
         }
 
@@ -2049,15 +2108,23 @@ FatFile InternalExtendedFindFile(char* path)
         char ext[4]; InternalMemorySet(ext, ' ', 3); ext[3] = '\0';
         for (int j = 0; j < StrLen(extRaw) && j < 3; j++) ext[j] = extRaw[j];
 
-        return GlobalServices->File->FindFile(name, ext);
+		char* nm = StrUpr(name);
+		char* xt = StrUpr(ext);
+
+        return GlobalServices->File->FindFile(nm, xt);
 	}
 
 	FatFile fileNull = {0};
     return fileNull; // no encontrado
 }
 KernelStatus InternalRunBinary(void* buffer, int size, KernelServices* Services) {
+	// bandera de si salio mas pequeño que el header
+	bool ProgramIsTooSmall = 0;
+	// bandera de que si el header fue invalido
+	bool InvalidHeaderFlag = 0;
+
 	// depurar
-	InternalDebug("[SysInternal]     Cargando programa\n");	
+	SystemInternalMessage("Cargando programa");
 
 	// incrementar nivel de privilegios
 	InternalRingLevel++;
@@ -2071,7 +2138,7 @@ KernelStatus InternalRunBinary(void* buffer, int size, KernelServices* Services)
 	int OldSizeProgram = ProgramMainSize;
 
 	// depurar
-	InternalDebug("[SysInternal]     Verificando pila de programas y ejecucion para apilar\n");	
+	SystemInternalMessage("Verificando pila de programas y ejecucion para apilar");	
 
 	// si ya esta en un programa
 	if (MemoryCurrentSystem == MemAllocTypePrograms) MakePagingEmulator = 1;
@@ -2083,19 +2150,19 @@ KernelStatus InternalRunBinary(void* buffer, int size, KernelServices* Services)
 	if (MakePagingEmulator) 
 	{
 		// depurar
-		InternalDebug("[SysInternal]     Se necesita copiar el programa a la pila de usuario\n");	
+		SystemInternalMessage("Se necesita copiar el programa a la pila de usuario");	
 
 		// hacer paginacion
 		ProgramDataAndThings = (uint8_t*)InternalAllocatePool(OldSizeProgram, MemAllocTypeProgramsStackMemory);
 		
 		// depurar
-		InternalDebug("[SysInternal]     Pila creada\n");	
+		SystemInternalMessage("Pila creada");	
 
 		// copiar
 		InternalMemoryCopy(ProgramDataAndThings, USER_LOAD_ADDR, OldSizeProgram);
 
 		// depurar
-		InternalDebug("[SysInternal]     Programa anterior guardado con exito\n");	
+		SystemInternalMessage("Programa anterior guardado con exito");	
 	}
 
 	// la longitud
@@ -2120,10 +2187,14 @@ KernelStatus InternalRunBinary(void* buffer, int size, KernelServices* Services)
     } UserHeader;
 
 	// si es menor el tamaño
-    if (size < sizeof(UserHeader)) return KerneLStatusThingVerySmall;
+    if (size < sizeof(UserHeader)) 
+	{
+		ProgramIsTooSmall = 1;
+		goto end_program;
+	}
 
 	// depurar
-	InternalDebug("[SysInternal]     Copiando programa a la memoria\n");	
+	SystemInternalMessage("Copiando programa a la memoria");	
 
 	// copiar al user load address el buffer
     InternalMemoryCopy(USER_LOAD_ADDR, buffer, size);
@@ -2132,13 +2203,17 @@ KernelStatus InternalRunBinary(void* buffer, int size, KernelServices* Services)
     UserHeader* hdr = (UserHeader*)USER_LOAD_ADDR;
 
 	// depurar
-	InternalDebug("[SysInternal]     Verificando header...\n");	
+	SystemInternalMessage("Verificando header...");	
 
 	// parametro invalido
-    if (Services->Memory->CompareMemory(hdr->magic, "ModuBin", 7) != 0) return KernelStatusInvalidParam;
+    if (Services->Memory->CompareMemory(hdr->magic, "ModuBin", 7) != 0) 
+	{
+		InvalidHeaderFlag = 1;
+		goto end_program;
+	}
 
 	// depurar
-	InternalDebug("[SysInternal]     Verificando bss...\n");	
+	SystemInternalMessage("Verificando bss...");	
 
 	// si es mayor el end que el start
     if (hdr->bss_end > hdr->bss_start) {
@@ -2149,7 +2224,7 @@ KernelStatus InternalRunBinary(void* buffer, int size, KernelServices* Services)
     }
 
 	// depurar
-	InternalDebug("[SysInternal]     Ejecutando programa...\n");	
+	SystemInternalMessage("Ejecutando programa...");	
 
 	// el tipo de programa
     typedef KernelStatus (*ProgramEntry)(KernelServices*);
@@ -2159,6 +2234,8 @@ KernelStatus InternalRunBinary(void* buffer, int size, KernelServices* Services)
 
 	// la ejecucion
 	KernelStatus Status = entry(Services);
+
+end_program:
 
 	// cambiar a ejecucion anterior
 	MemoryCurrentSystem = OldMallocType;
@@ -2170,7 +2247,7 @@ KernelStatus InternalRunBinary(void* buffer, int size, KernelServices* Services)
 	if (MakePagingEmulator) 
 	{
 		// depurar
-		InternalDebug("[SysInternal]    Cargando programa anterior...\n");	
+		InternalDebug("[SysInternal]    Cargando programa anterior...");	
 
 		// copiarlo de nuevo
 		InternalMemoryCopy(USER_LOAD_ADDR, ProgramDataAndThings, OldSizeProgram);
@@ -2179,20 +2256,17 @@ KernelStatus InternalRunBinary(void* buffer, int size, KernelServices* Services)
 		FreePool(ProgramDataAndThings);
 
 		// depurar
-		InternalDebug("[SysInternal]     Cargado con exito...\n");	
+		SystemInternalMessage("Cargado con exito...");	
 	}
 
 	// decrementar nivel de privilegios
 	InternalRingLevel--;
 
-	// depurar
-	InternalDebug("[SysInternal]     Programa terminado con status: ");	
+	// si fue menor
+	if (ProgramIsTooSmall) return KerneLStatusThingVerySmall;
 
-	char serialStatus[30];
-
-	IntToString2Digits(Status, serialStatus);
-	InternalDebug(serialStatus);	
-	InternalDebug("\n");	
+	// si la bandera fue invalida
+	if (InvalidHeaderFlag) return KernelStatusInvalidParam;
 
 	// retornar el status
     return Status;
@@ -2321,6 +2395,8 @@ void InternalDumpHexMemory(void* buffer, size_t size) {
 void InternalSysCommandExecute(KernelServices* Services, char* command, int lena)
 {
 	int len = StrLen(command);
+
+	SystemInternalMessage(command);
 
 	if (StrCmp(command, "cls") == 0) Services->Display->clearScreen();
 	else if (command[0] == '#') return;
@@ -2467,6 +2543,14 @@ void InternalSysCommandExecute(KernelServices* Services, char* command, int lena
 				}
 
 			}
+
+			GlobalServices->File->CloseFile(StructureFs);
+
+			for (size_t i = 0; i < indexPutDirs; i++)
+			{
+				FreePool(putedDirs[i]);
+			}
+			
 		}
 		else {
 			// leer boot sector
@@ -2588,7 +2672,10 @@ void InternalSysCommandExecute(KernelServices* Services, char* command, int lena
 		InternalRingLevel--;
 
 		Services->Memory->FreePool(buffer);
-		Services->Display->printg("no se pudo ejecutar");
+		Services->File->CloseFile(file);
+		Services->Memory->FreePool(NameExtended);
+
+		if (status) Services->Display->printg("no se pudo ejecutar");
 	}
 	else if (StrnCmp(command, "cat ", 4) == 0)
 	{
@@ -2925,31 +3012,7 @@ void InternalSysCommandExecute(KernelServices* Services, char* command, int lena
 
         void* buffer = 0;
         int size = 0;
-        KernelStatus status;
 
-        // 1. Intentar BIN
-        FatFile file = Services->File->FindFile(name, "BIN");
-        status = Services->File->GetFile(file, &buffer, &size);
-        if (!_StatusError(status)) {
-            KernelStatus result = Services->Misc->RunBinary(buffer, size, Services);
-			Services->Memory->FreePool(buffer);
-			return;
-        }
-
-		Services->Memory->FreePool(buffer);
-
-        file = Services->File->FindFile(name, "NSH");
-        status = Services->File->GetFile(file, &buffer, &size);
-        if (!_StatusError(status)) {
-            char* text = (char*)buffer; char* parts[120];
-            int n = StrSplit(text, parts, '\n');
-            for (int i = 0; i < n; i++) Services->Misc->Run(Services, parts[i], 0);
-            Services->Memory->FreePool(buffer);
-			return;
-        }
-
-		Services->Memory->FreePool(buffer);
-	
 		char* Directory = CurrentWorkDirectory;
 		size_t dirLen = StrLen(Directory);
 		size_t fileLen = StrLen(Params[0]);
@@ -2959,9 +3022,8 @@ void InternalSysCommandExecute(KernelServices* Services, char* command, int lena
 		InternalMemoryCopy(NameExtended + dirLen, Params[0], fileLen);
 		NameExtended[dirLen + fileLen] = '\0';
 
-        // 3. Intentar alias extendido
-        file = Services->File->OpenFile(NameExtended);
-        status = Services->File->GetFile(file, &buffer, &size);
+        FatFile file = Services->File->OpenFile(NameExtended);
+        KernelStatus status = Services->File->GetFile(file, &buffer, &size);
         if (!_StatusError(status)) {
 			*Services->Misc->ParamsCount = ParamsCount + 2; // tipo + count + args
 
@@ -2977,11 +3039,12 @@ void InternalSysCommandExecute(KernelServices* Services, char* command, int lena
             KernelStatus result = Services->Misc->RunBinary(buffer, size, Services);
             
 			Services->Memory->FreePool(NameExtended);
+			Services->File->CloseFile(file);
 			Services->Memory->FreePool(buffer);
 			return;
         }		
 		Services->Memory->FreePool(buffer);
-
+		Services->File->CloseFile(file);
 		Services->Memory->FreePool(NameExtended);
 
         Services->Display->printg("no se pudo leer archivo\n");
@@ -3008,7 +3071,7 @@ void k_main()
 	InternalDebug("ModuKernel Debug Console\n\nBienvenido a la consola de desarrollo de tu kernel basado en ModuKernel, aqui veras las noticias que mande tu sistema operativo en tiempo real, puede tambien proximamente mandar acciones al kernel y interrumpir\n");
 
 	// debuggear
-	InternalDebug("[SysInternal]     ModuKernel ha entrado en C\n");
+	SystemInternalMessage("ModuKernel ha entrado en C");
 
 	// etapa de arranque prematura aqui se inicializan los servicios basicos
 	// mas no los servicios del kernel donde se iniciaran prototipadamente
@@ -3020,13 +3083,13 @@ void k_main()
 	MemoryCurrentSystem = MemAllocTypeKernelServices;
 
 	// debuggear
-	InternalDebug("[SysInternal]     Inicializando Heap...\n");
+	SystemInternalMessage("Inicializando Heap...");
 
 	// inicializar heap para AllocatePool y FreePool
 	InitHeap();
 
 	// debuggear
-	InternalDebug("[SysInternal]     Inicializando Servicios...\n");
+	SystemInternalMessage("Inicializando Servicios...");
 
 	// los servicios
     KernelServices Services;
@@ -3039,7 +3102,7 @@ void k_main()
 	// la pantalla
 
 	// debuggear
-	InternalDebug("[SysInternal]     Inicializando Pantalla...\n");
+	SystemInternalMessage("Inicializando Pantalla...");
 
 	// setear el servicio acutal de la pantalla
     Services.Display->Set(Services.Display);
@@ -3060,7 +3123,7 @@ void k_main()
 	Services.Music->Mute();
 
 	// debuggear
-	InternalDebug("[SysInternal]     Empezando a arrancar\n");
+	SystemInternalMessage("Empezando a arrancan");
 
 	// imprimir la promocion
 	Services.Display->printg("ErickCraftStudios ModuKernel (Operating System)\n\n");
@@ -3075,12 +3138,16 @@ void k_main()
 	// limpiar la pantalla
 	Services.Display->clearScreen();
 	
+	// proteger regiones
+	InternalProtectRegion(heap_start, sizeof(heap_start), GdtLevelInRing0);
+	InternalProtectRegion(heap_ptr, sizeof(heap_ptr), GdtLevelInRing0);
+
 	// esto no es otra etapa de arranque, sigue siendo la etapa de arranque normal
 	// aunque aqui se hace una animacion para que no se vea muy cutre, recuerden, pueden
 	// personalizarla si se basan en el kernel
 
 	// debuggear
-	InternalDebug("[SysInternal]     Mostrando logo...\n");
+	SystemInternalMessage("Mostrando logo...");
 
 	char interrupted = 0;
 
@@ -3133,8 +3200,8 @@ void k_main()
 	}	
 
 	// debuggear
-	InternalDebug("[SysInternal]     Kernel Cargado\n");
-	InternalDebug("*** logs de modo usuario ***\n");
+	SystemInternalMessage("Kernel Cargado");
+	InternalDebug("\x1B[96m--- *** logs de modo usuario *** ---\x1B[0m\n\n");
 
 	// etapa de usuario esta no es una etapa de arranque si no la recta final pero
 	// aqui el usuario ya tiene control completo del sistema y ya el sistema esta totalmente
@@ -3391,7 +3458,7 @@ void InternalSleepDream(KernelServices* Serv)
 	{
 		// liberar memoria basuara, o no liberada
 		if (
-			Index->Type == MemAllocTypeSystem || Index->Type == MemAllocTypePrograms
+			Index->Type == MemAllocTypeSystem || Index->Type == MemAllocTypePrograms 
 		)
 		 FreePool(Index->MemoryPtr);
 

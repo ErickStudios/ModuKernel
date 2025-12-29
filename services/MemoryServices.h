@@ -15,6 +15,8 @@ typedef int (*KernelMemoryComparate)(const void *s1, const void *s2, unsigned in
 typedef unsigned int (*KernelMemoryGetFreeHeapSize)();
 /* el tipo para dormir al sistema y hacer reparaciones de memoria */
 typedef void (*KernelMemoryRepairMemoryByDream)(struct _KernelServices* Services);
+/* el tipo para setear memoria */
+typedef void* (*KernelMemorySet)(void* dest, int value, unsigned int count);
 /* enum para los tipos de memoria dinamica del Kernel */
 typedef enum _ModuAllocType
 {
@@ -77,5 +79,9 @@ typedef struct _MemoryServices {
     siempre lo podras despertar presionando enter en todas las etapas del repair memory
     menos en el FAUM que alli necesita estar despierto*/
     KernelMemoryRepairMemoryByDream RepairMemory;
+    /* funcion para llenar una parte de memoria con un valor, el primer parametro
+    es el puntero, el segundo el valor con el cual se va a llenar, el tercero
+    es el tamaño de lo que se llenara*/
+    KernelMemorySet MemorySet;
 } MemoryServices;
 #endif
