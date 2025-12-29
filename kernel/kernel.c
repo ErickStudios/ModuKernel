@@ -13,16 +13,21 @@
 // incluir funciones de la libreria c de bajo nivel
 #include "../libc/String.h"
 
-// funciones del kernel
-#include "../services/headers/memory.h"
-#include "../services/headers/disk.h"
-#include "../services/headers/gdt.h"
-
 // servicios globales
 KernelServices* GlobalServices;
 
 // klib
 #include "../klib/Klib.h"
+
+// funciones del kernel
+#include "../services/headers/memory.h"
+#include "../services/headers/disk.h"
+#include "../services/headers/gdt.h"
+#include "../handlers/idt.h"
+#include "../handlers/exceptions.h"
+
+// manejador de excepciones
+ObjectAny ExceptionHandlePtr;
 
 // mayusculas y minusculas
 bool LowerUpper = 0;
@@ -65,6 +70,11 @@ extern function InternalGopScreenInit();
 extern function InternalSendCharToSerial(char ch);
 extern function InternalKernelHaltReal();
 
+// pit
+#define PIT_FREQUENCY     1193182
+#define PIT_PORT_COMMAND  0x43
+#define PIT_PORT_CHANNEL0 0x40
+
 void InternalSendCharToSerialFy(char ch) {
     // esperar transmisor listo
     while ((inb(0x3F8 + 5) & 0x20) == 0);
@@ -72,7 +82,22 @@ void InternalSendCharToSerialFy(char ch) {
     // enviar carácter
     outb(0x3F8, (uint8_t)ch);
 }
+void idt_init() {
+    idt_ptr.limit = sizeof(idt) - 1;
+    idt_ptr.base  = (uint32_t)&idt;
 
+    InternalMemorySet(&idt, 0, sizeof(idt));
+
+	// division por 0
+    set_idt_entry(0, (uint32_t)IdtDivideBy0, 0x08, 0x8E);
+	// overlow
+	set_idt_entry(4, (uint32_t)IdtExOverflow, 0x08, 0x8E);
+	// page fault
+	set_idt_entry(14, (uint32_t)IdtExPageFault, 0x08, 0x8E);
+
+    // cargar IDT
+    asm volatile("lidt %0" :: "m"(idt_ptr));
+}
 void set_gdt_entry(int num, uint32_t base, uint32_t limit, uint8_t access, uint8_t gran)
 {
     gdt[num].base_low    = (base & 0xFFFF);
@@ -85,7 +110,6 @@ void set_gdt_entry(int num, uint32_t base, uint32_t limit, uint8_t access, uint8
     gdt[num].granularity |= (gran & 0xF0);
     gdt[num].access      = access;
 }
-
 void InternalProtectRegion(void* ptr, uint32_t size, enum GdtLevelIn level)
 {
     uint32_t base  = (uint32_t)ptr;
@@ -104,7 +128,6 @@ void InternalProtectRegion(void* ptr, uint32_t size, enum GdtLevelIn level)
 
     set_gdt_entry(GdtSetProtectRegion++ , base, limit, access, gran);
 }
-
 void InternalDebug(char* str)
 {
 	char* String = str;
@@ -115,12 +138,6 @@ void InternalDebug(char* str)
 		InternalSendCharToSerialFy(*(String++));
 	}
 }
-
-// pit
-#define PIT_FREQUENCY     1193182
-#define PIT_PORT_COMMAND  0x43
-#define PIT_PORT_CHANNEL0 0x40
-
 void SystemInternalMessage(char* msg)
 {
 	InternalDebug("\x1B[94m[  \x1B[92mSysInternal  \x1B[94m]     \x1B[0m");
@@ -150,7 +167,6 @@ void init_gdt() {
     gdt[2].granularity  = 0xCF;
     gdt[2].base_high    = 0x00;
 }
-
 void pit_init(uint32_t freq) {
     uint16_t divisor = (uint16_t)(PIT_FREQUENCY / freq);
 
@@ -1335,6 +1351,8 @@ KernelStatus InternalRunBinary(void* buffer, int size, KernelServices* Services)
 	// donde carga el programa
 	#define USER_LOAD_ADDR Services->Info->ModuWorldPtr
 
+	ExceptionHandlePtr = &&end_program;
+
 	// si se va a hacer paginacion
 	if (MakePagingEmulator) 
 	{
@@ -1589,6 +1607,11 @@ void InternalSysCommandExecute(KernelServices* Services, char* command, int lena
 
 	if (StrCmp(command, "cls") == 0) Services->Display->clearScreen();
 	else if (command[0] == '#') return;
+	else if (StrCmp(command, "div0") == 0)
+	{
+		int eab = 10;
+		eab /= 0;
+	}
 	else if (StrnCmp(command, "cd ", 3) == 0)
 	{
 		char* directory = command + 3;
@@ -2265,6 +2288,9 @@ void k_main()
 
 	// inicializar heap para AllocatePool y FreePool
 	InitHeap();
+
+	// inicializar idt
+	idt_init();
 
 	// debuggear
 	SystemInternalMessage("Inicializando Servicios...");

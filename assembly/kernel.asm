@@ -6,6 +6,8 @@
 ; es un kernel de 32 bits
 bits 32
 
+section .note.GNU-stack
+
 ; multiboot
 section .multiboot
 	; header multiboot
@@ -38,6 +40,7 @@ extern gdt_ptr					; puntero al gdt
 %include "assembly/hlt.asm"		; hlt
 %include "assembly/gop.asm"		; graficos
 %include "assembly/serial.asm" 	; consola serial
+%include "assembly/exceptions.asm"; excepciones
 
 ; seccion de datos sin inicializar
 section .bss
