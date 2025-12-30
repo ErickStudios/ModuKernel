@@ -59,6 +59,13 @@ for file in build/modules/*.modubin; do
 done
 
 afaf=0
+for file in build/moddrivers/*.modubin; do
+    nameq=$(basename "$file"); name="${nameq%.*}"
+    cp "$file" "disk/DV$afaf.BIN"
+    echo "/dev/$name;DV$afaf;BIN;" >> disk/FSLST.IFS
+    let afaf=afaf+1
+done
+
 for file in drivers/*.c; do
     nameq=$(basename "$file"); name="${nameq%.*}"
     compile_raw "$file" "disk/DV$afaf.BIN"
