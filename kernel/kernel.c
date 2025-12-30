@@ -27,6 +27,9 @@ KernelServices* GlobalServices;
 #include "../handlers/exceptions.h"
 #include "../syscalls/syscall.h"
 
+// el comando de debug
+bool ActivatedCommandDebug = 0;
+
 // manejador de excepciones
 ObjectAny ExceptionHandlePtr;
 
@@ -2175,6 +2178,10 @@ void InternalSysCommandExecute(KernelServices* Services, char* command, int lena
 	}
 	else if (StrCmp(command, "ugrm") == 0) unconfig_mode();
 	else if (StrCmp(command, "grm") == 0) config_mode();
+	else if (StrCmp(command, "dbg /on") == 0)
+		ActivatedCommandDebug = 1;
+	else if (StrCmp(command, "dbg /off") == 0)
+		ActivatedCommandDebug = 0;
 	else if (StrnCmp(command, "cla ", 4) == 0)
 	{
 		char* sd = command + 4;
@@ -2270,11 +2277,14 @@ void InternalSysCommandExecute(KernelServices* Services, char* command, int lena
 			Services->File->CloseFile(file);
 			Services->Memory->FreePool(buffer);
 
-			Services->Display->printg("\nReturn Status: ");
-			char* StatusStr = StatusToString(result);
-			Services->Display->printg(StatusStr);
-			Services->Display->printg("\n");
-			Services->Memory->FreePool(StatusStr);
+			if (ActivatedCommandDebug)
+			{
+				Services->Display->printg("\nReturn Status: ");
+				char* StatusStr = StatusToString(result);
+				Services->Display->printg(StatusStr);
+				Services->Display->printg("\n");
+				Services->Memory->FreePool(StatusStr);
+			}
 			return;
         }		
 		Services->Memory->FreePool(buffer);
