@@ -27,3 +27,4 @@ void KillProcess(regs_t* r)
 #include "exceptions/div0.h"
 #include "exceptions/overflow.h"
 #include "exceptions/pagefault.h"
+#include "exceptions/doublefault.h"

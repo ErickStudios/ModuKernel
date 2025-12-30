@@ -93,6 +93,8 @@ void idt_init() {
     set_idt_entry(0, (uint32_t)IdtDivideBy0, 0x08, 0x8E);
 	// overlow
 	set_idt_entry(4, (uint32_t)IdtExOverflow, 0x08, 0x8E);
+	// doble fault
+	set_idt_entry(8, (uint32_t)IdtExPageFault, 0x08, 0x8E);
 	// page fault
 	set_idt_entry(14, (uint32_t)IdtExPageFault, 0x08, 0x8E);
 
@@ -2173,6 +2175,17 @@ void InternalSysCommandExecute(KernelServices* Services, char* command, int lena
 	}
 	else if (StrCmp(command, "ugrm") == 0) unconfig_mode();
 	else if (StrCmp(command, "grm") == 0) config_mode();
+	else if (StrnCmp(command, "cla ", 4) == 0)
+	{
+		char* sd = command + 4;
+		
+		uint32_t Directiona = HexStringToInt(sd);
+
+		typedef void (*JmpLabel)();
+
+		JmpLabel Lbl = (JmpLabel)(uintptr_t)Directiona;
+		Lbl();
+	}
 	else if (StrCmp(command, "ulr") == 0) 
 	{
 		char esb[30];

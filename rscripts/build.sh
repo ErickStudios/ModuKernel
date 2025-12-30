@@ -137,4 +137,6 @@ qemu-system-i386 \
   -hda build/disk.img \
   -m 512M \
   -vga std \
+    -device isa-debugcon,chardev=mimami \
+    -chardev stdio,id=mimami \
   -audiodev pa,id=snd0,out.frequency=44100,out.channels=2
