@@ -71,7 +71,7 @@ config_mode:
 
 	AjustarCrtc 0x04, 0x52		; inicio del retrazo de horizontal
 	AjustarCrtc 0x05, 0x56		; fin del retrazo de horizontal
-	AjustarCrtc 0x01, 0x8F		; fin del display horizontal
+	AjustarCrtc 0x01, 0x9F		; fin del display horizontal
 
 	; blanco horizontal
 	AjustarCrtc 0x02, 0x50		; inicio del blanco horizontal
@@ -93,8 +93,8 @@ config_mode:
 	AjustarCrtc 0x0F, 0x00
 
 	; retrazo vertical
-	AjustarCrtc 0x10, 0x10C		; inicio del retrazo vertical
-	AjustarCrtc 0x11, 0xFE		; fin del retrazo vertical
+	AjustarCrtc 0x10, 0x11C		; inicio del retrazo vertical
+	AjustarCrtc 0x11, 0xFF		; fin del retrazo vertical
 	AjustarCrtc 0x12, 0xFF		; fin del display vertical
 
 	; offset

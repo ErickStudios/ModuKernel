@@ -1,37 +1,37 @@
-; Compilar: nasm -f elf32 userprog.asm -o userprog.o
-; Linkear:  ld -m elf_i386 -T ABI/user_link.ld -o userprog.bin userprog.o
-
+; global
 global ErickMain
 
+; datos
 section .data
-msg        db "Hello World!", 0
-msg_len    equ $ - msg
+    ; mensaje
+    msg        db "Hello World!", 0
 
+; bss
 section .bss
-buffer     resb 64
+    ; el buffer
+    buffer     resb 64
 
-; eax: service
-; ecx: function
-; ebx: param1
-; edx: param2
-
+; texto
 section .text
+; funcion principal
 ErickMain:
     ; limpiar la pantalla
-    mov eax, 1         ; llamadas a la pantalla
-    mov ecx, 1         ; Display.clearscreen
-    int 80h            ; llamar
+    mov eax, 1      ; servicio
+    mov ecx, 1      ; llamada
+    int 80h         ; llamar
 
     ; dibujar mensaje
-    mov eax, 1         ; llamadas a la pantalla
-    mov ecx, 0         ; Display.printg
-    mov ebx, msg       ; mensaje
-    int 80h            ; llamar
+    mov eax, 1      ; servicio
+    mov ecx, 0      ; llamada
+    mov ebx, msg    ; parametro
+    int 80h         ; llamar
 
-    mov edi, buffer
-    mov ecx, 64
-    xor eax, eax
-    rep stosb
+    ; llenar buffer?
+    mov edi, buffer ; direccion
+    mov ecx, 64     ; cuanto
+    xor eax, eax    ; llenar
+    rep stosb       ; repetir
 
-    mov eax, 0
-    ret
+    ; retornar
+    mov eax, 0      ; estatus
+    ret             ; regresar

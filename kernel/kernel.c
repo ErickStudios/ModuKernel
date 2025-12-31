@@ -320,7 +320,11 @@ void DrawLetter(int x, int y, char letter, uint8_t color)
 }
 uint8_t InternalPixelGetColorOf(int x, int y)
 {
-	if (!InternalGrapichalFlag) return 0;
+	if (!InternalGrapichalFlag)
+	{
+		uint8_t* VidMem = (uint8_t *)0xb8000;
+		return VidMem[((y * 25) + x) * 2];
+	} 
 
 	uint8_t* VidMem = (uint8_t *)0xA0000;
 
@@ -2182,17 +2186,6 @@ void InternalSysCommandExecute(KernelServices* Services, char* command, int lena
 		ActivatedCommandDebug = 1;
 	else if (StrCmp(command, "dbg /off") == 0)
 		ActivatedCommandDebug = 0;
-	else if (StrnCmp(command, "cla ", 4) == 0)
-	{
-		char* sd = command + 4;
-		
-		uint32_t Directiona = HexStringToInt(sd);
-
-		typedef void (*JmpLabel)();
-
-		JmpLabel Lbl = (JmpLabel)(uintptr_t)Directiona;
-		Lbl();
-	}
 	else if (StrCmp(command, "ulr") == 0) 
 	{
 		char esb[30];
@@ -2260,6 +2253,8 @@ void InternalSysCommandExecute(KernelServices* Services, char* command, int lena
         FatFile file = Services->File->OpenFile(NameExtended);
         KernelStatus status = Services->File->GetFile(file, &buffer, &size);
         if (!_StatusError(status)) {
+			void*** PoolM = AllocatePool(sizeof(void**) * (ParamsCount + 2));
+			Services->Misc->Paramaters = PoolM;
 			*Services->Misc->ParamsCount = ParamsCount + 2; // tipo + count + args
 
 			int Magic = 0x043b;
@@ -2285,6 +2280,8 @@ void InternalSysCommandExecute(KernelServices* Services, char* command, int lena
 				Services->Display->printg("\n");
 				Services->Memory->FreePool(StatusStr);
 			}
+
+			FreePool(PoolM);
 			return;
         }		
 		Services->Memory->FreePool(buffer);
@@ -2545,7 +2542,7 @@ void InternalPrintgNonLine(char *message)
 				column++;
 			}
 
-			if (column >= 28)
+			if (column >= 32)
 			{
 				line++;
 				column = 0;

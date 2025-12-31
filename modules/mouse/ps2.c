@@ -38,7 +38,7 @@ KernelStatus ErickMain(KernelServices* Services)
 {
     // inicializar libreria
     InitializeLibrary(Services);
-
+    
     // inicializar mouse
     MouseInit();
 

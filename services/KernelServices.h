@@ -57,6 +57,10 @@ typedef struct _KernelSystemInfo
     /* puntero a la memoria de video de el kernel y por lo tanto de
     VGA */
     uint8_t* VideoMemPtr;
+    /* apunta a los parametros de driver*/
+    uint32_t DriverParams[20];
+    /* apunta a los parametros de programa que no son de la shell */
+    uintptr_t ProgramParams[20];
 } KernelSystemInfo; 
 /* el tipo para ejecutar un comando */
 typedef void (*KernelServicesExecuteCommand)(struct _KernelServices* Services, char* command, int len);

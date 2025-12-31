@@ -10,3 +10,4 @@ compile_raw() {
 compile_raw modules/init/main.c build/modules/init.modubin
 compile_raw modules/shell/main.c build/modules/modush.modubin
 compile_raw modules/mouse/ps2.c build/moddrivers/mps2.modubin
+compile_raw modules/pci/driver.c build/moddrivers/pci.modubin
