@@ -11,9 +11,38 @@ start:
 	; stub
 	jmp pre_c_boot_stage1		; stub para el no se que
 	hlt							; por si acaso
+	
+global switch_to_task
+switch_to_task:
+    mov eax, [esp+4]    ; puntero a task_t
+    mov esp, [eax]      ; restaurar esp
+    mov ebp, [eax+4]    ; restaurar ebp
+    jmp [eax+8]         ; saltar a eip
 
 global isr_keyboard_stub
+global isr_idt_stub
 extern keyboard_handler
+extern pic_handler
+isr_idt_stub:
+	; guardar
+    pusha                           ; guardar todos los generales
+    push ds                         ; guardar ds
+    push es                         ; guardar es
+    push fs                         ; guardar fs
+    push gs                         ; guardar gs
+
+    push esp                        ; ponerlo
+    call pic_handler
+    add esp, 4                      ; vaciar la pila
+
+    ; recuperar
+    pop gs                          ; recuperar gs
+    pop fs                          ; recuperar fs
+    pop es                          ; recuperar es
+    pop ds                          ; recuperar ds
+    popa                            ; recuperar los generales
+    iret
+
 isr_keyboard_stub:
 	; guardar
     pusha                           ; guardar todos los generales

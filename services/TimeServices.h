@@ -9,5 +9,7 @@ typedef struct _TimeServices {
     se puede esperar, esto puede ser diferente dependiendo de la
     fecuencia del procesador */
     KernelTimeServicesWait TaskDelay;
+    /* puntero al contador pit */
+    uint32_t* PicCountPtr;
 } TimeServices;
 #endif

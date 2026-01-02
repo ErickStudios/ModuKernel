@@ -30,9 +30,6 @@ KernelServices* GlobalServices;
 #include "../handlers/exceptions.h"
 #include "../syscalls/syscall.h"
 
-// incluir las teclas
-#include "key.h"
-
 // el comando de debug
 bool ActivatedCommandDebug = 0;
 
@@ -82,6 +79,11 @@ extern function InternalKernelHaltReal();
 #define PIT_PORT_COMMAND  0x43
 #define PIT_PORT_CHANNEL0 0x40
 
+// incluir las teclas
+#include "key.h"
+
+uint32_t PitCounter = 0;
+
 void InternalSendCharToSerialFy(char ch) {
     // esperar transmisor listo
     while ((inb(0x3F8 + 5) & 0x20) == 0);
@@ -90,6 +92,12 @@ void InternalSendCharToSerialFy(char ch) {
     outb(0x3F8, (uint8_t)ch);
 }
 extern void isr_keyboard_stub();
+extern void isr_idt_stub();
+void pic_handler(regs_t* r) {
+	PitCounter++;
+
+    outb(0x20, 0x20); // EOI
+}
 static void pic_remap(void) {
     // ICW1: iniciar
     outb(0x20, 0x11); // PIC maestro
@@ -108,7 +116,7 @@ static void pic_remap(void) {
     outb(0xA1, 0x01);
 
     // Enmascarar todo inicialmente
-    outb(0x21, 0xFF);
+    outb(0x21, 0x11111100);
     outb(0xA1, 0xFF);
 }
 static void pic_unmask_irq1(void) {
@@ -135,6 +143,9 @@ void idt_init() {
 
 	// teclado
 	set_idt_entry(0x21, (uint32_t)isr_keyboard_stub,  0x08, 0x8E);
+	
+	// pic
+	set_idt_entry(32, (uint32_t)isr_idt_stub,  0x08, 0x8E);
 
     // cargar IDT
     asm volatile("lidt %0" :: "m"(idt_ptr));
@@ -842,7 +853,7 @@ char* InternalReadLine()
 		// para el caracter
 		if (key != 0 && key != '\n' && key != '\b') char_set++;
 		// si es enter
-		if (key == '\n')
+		if (key == '\n' || ControlCCloseActive)
 		{	
 			// crearlo
 			char* retval = AllocatePool(sizeof(char) * 256);
@@ -981,6 +992,8 @@ unsigned char InternalKeyboardReadChar()
 
         uint8_t scancode = readkey();
         if (scancode == 0) continue;
+
+		if (ControlCCloseActive) return 0;
 
 		// si es verdadero
 		if(1) {
@@ -1264,6 +1277,7 @@ void InitializeKernel(KernelServices* Services)
 
 	// tiempo
 	Tim->TaskDelay 	= &InternalWaitEticks;
+	Tim->PicCountPtr= &PitCounter;
 
 	// musica
 	Music->PlayTone	= &InternalMusicSetTone;
@@ -1482,6 +1496,8 @@ KernelStatus InternalRunBinary(void* buffer, int size, KernelServices* Services)
 	KernelStatus Status = entry(Services);
 
 end_program:
+	// desactivar
+	if (ControlCCloseActive) ControlCCloseActive = 0;
 
 	// cambiar a ejecucion anterior
 	MemoryCurrentSystem = OldMallocType;
@@ -2326,7 +2342,33 @@ void k_main()
 	idt_init();        
 	pic_unmask_irq1(); 
 
+	// activar interrupciones
 	asm volatile("sti");
+
+	InternalPrintg("Boot From:",0);
+	InternalPrintg("a) Hard Disk",2);
+	InternalPrintg("b) Floppy Disk",3);
+	InternalPrintg("c) CD-ROM",4);
+	InternalPrintg("Enter key for chose the Hard Disk",6);
+
+	char Option = 0;
+
+ChoseDiskToBoot:
+	Option = InternalKeyboardReadChar();
+	Option = CharToUpCase(Option);
+
+	// disco duro
+	if (Option == 'A' || Option == '\n')
+		SystemCwkDisk = DiskTypeHardDisk;
+	// disco floppy
+	else if (Option == 'B')
+		 SystemCwkDisk = DiskTypeFloppy;
+	// cdrom
+	else if (Option == 'C') 
+		SystemCwkDisk = DiskTypeCdRom;
+	// no es valido
+	else
+		goto ChoseDiskToBoot;
 
 	InternalDebug("ModuKernel Debug Console\n\nBienvenido a la consola de desarrollo de tu kernel basado en ModuKernel, aqui veras las noticias que mande tu sistema operativo en tiempo real, puede tambien proximamente mandar acciones al kernel y interrumpir\n");
 
@@ -2335,9 +2377,6 @@ void k_main()
 
 	// etapa de arranque prematura aqui se inicializan los servicios basicos
 	// mas no los servicios del kernel donde se iniciaran prototipadamente
-
-	// el tipo de disco actual
-	SystemCwkDisk = DiskTypeHardDisk;
 
 	// memoria actual
 	MemoryCurrentSystem = MemAllocTypeKernelServices;
@@ -2380,10 +2419,6 @@ void k_main()
 
 	// ir a la posicion x0y0
 	Services.Display->setCursorPosition(0,0);
-
-	Services.Music->PlayTone(440);
-	Services.Time->TaskDelay(20);
-	Services.Music->Mute();
 
 	// debuggear
 	SystemInternalMessage("Empezando a arrancan");
@@ -2428,7 +2463,10 @@ void k_main()
 	Services.File->CloseFile(InitFile);
 
 	// ahora que hacemos si no esta
-	if (_StatusError(OpenInit)) Services.Misc->Throw(KernelStatusNotFound);
+	if (_StatusError(OpenInit)) {
+		// hacer un throw
+		Services.Misc->Throw(KernelStatusNotFound);
+	}
 }
 KernelStatus ProcessCrtByFile(char* name, char* ext, KernelServices* Services)
 {

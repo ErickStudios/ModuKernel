@@ -32,6 +32,8 @@ void waitforkey(void) {
     while (keypackage_incomming == 0) { asm volatile("pause"); } // espera ligera
 }
 
+bool ControlCCloseActive = 0;
+
 void keyboard_handler(regs_t* r) {
     uint8_t scancode = inb(0x60);
 
@@ -47,7 +49,8 @@ void keyboard_handler(regs_t* r) {
     else if (CtrlPressedKey) {
         if (scancode == 0x2E) {
             // Control+C detectado
-            GlobalServices->Display->printg("\n^C");
+            GlobalServices->Display->printg("^C");
+            ControlCCloseActive = 1;
             r->eip = (uint32_t)ExceptionHandlePtr;
         }
     }

@@ -12,6 +12,21 @@ typedef enum _MusicalNotes
     NoteSi = 493
 } MusicalNotes;
 
+KernelStatus LoopMakeSong(KernelServices* Services)
+{
+    while (1)
+    {
+        Services->Display->printg("> ");
+        char* Line = Services->InputOutput->ReadLine();
+        Services->Display->printg("\n");
+
+        if (StrCmp(Line, "exit") == 0) return KernelStatusSuccess;
+        else Services->Music->PlayTone(StringToInt(Line));
+
+        Services->Memory->FreePool(Line);
+    }
+}
+
 KernelStatus ErickMain(KernelServices* Services)
 {
     while (1)
@@ -30,6 +45,7 @@ KernelStatus ErickMain(KernelServices* Services)
             Services->Music->Mute();
             return KernelStatusSuccess;
         }
+        else if (Key == 't' || Key == 'T') LoopMakeSong(Services);
         else Services->Music->Mute();
     }
 }
