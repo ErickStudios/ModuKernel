@@ -9,6 +9,88 @@ ModuKernel que esta definida en modules/shell/main.c */
 #include "../../library/lib.h"
 #include "serial.h"
 
+/* ejecutor */
+void InternalExecuteScript(char* buffer)
+{
+	int StackI[100];
+	int StackLine = 0;
+
+	char* text = (char*)buffer;
+	char* parts[512];
+    int n = StrSplit(text, parts, '\n');
+    for (int i = 0; i < n; i++) 
+	{
+		char* Line = StrTrim(parts[i]);
+
+		if (StrnCmp(Line, "call ", 5) == 0)
+		{
+			char* Function = Line + 5;
+			int NewLen = (sizeof(char) * (StrLen(Function) + 2));
+
+			char* fnline = gMS->AllocatePool(NewLen);
+
+			gMS->CoppyMemory(fnline, Function, NewLen);
+
+			fnline[NewLen - 1] = 0;
+			fnline[NewLen - 2] = ':';
+
+			bool Founded = 0;
+			int LineIn = 0;
+
+			for (size_t j = 0; j < n; j++)
+			{
+				char* Line2 = StrTrim(parts[j]);
+
+				if (StrCmp(Line2, fnline) == 0)
+				{
+					Founded = 1;
+					LineIn = j;
+				}
+			}
+
+			if (Founded)
+			{
+				int OldLine = i;
+				StackI[StackLine++] = OldLine;
+				i = LineIn;
+			}
+		}
+		else if (StrnCmp(Line, "jmp ", 4) == 0)
+		{
+			char* Function = Line + 4;
+			int NewLen = (sizeof(char) * (StrLen(Function) + 2));
+
+			char* fnline = gMS->AllocatePool(NewLen);
+
+			gMS->CoppyMemory(fnline, Function, NewLen);
+
+			fnline[NewLen - 1] = 0;
+			fnline[NewLen - 2] = ':';
+
+			bool Founded = 0;
+			int LineIn = 0;
+
+			for (size_t j = 0; j < n; j++)
+			{
+				char* Line2 = StrTrim(parts[j]);
+
+				if (StrCmp(Line2, fnline) == 0)
+				{
+					Founded = 1;
+					LineIn = j;
+				}
+			}
+
+			if (Founded)
+			{
+				i = LineIn;
+			}
+		}
+		else if (StrCmp(Line, "ret") == 0) i = StackI[StackLine--];
+		else gSys->Misc->Run(gSys, Line, 0);
+	}
+}
+
 /* funcion principal */
 KernelStatus ErickMain(KernelServices *Services)
 {
@@ -85,23 +167,25 @@ KernelStatus ErickMain(KernelServices *Services)
 
 	Services->Display->printg("\n\n");
 
-    FatFile OtherFile = Services->File->OpenFile("/kernel/modush");
+    FatFile OtherFile = Services->File->OpenFile("/sys/init.sh");
 
     void* content; int size;
 
-    KernelStatus OpenFileBin = Services->File->GetFile(OtherFile, &content, &size);
+    KernelStatus OpenInitScript = Services->File->GetFile(OtherFile, &content, &size);
 
     // ejecutar
-    if (!(_StatusError(OpenFileBin)))
+    if (!(_StatusError(OpenInitScript)))
     {
-        Services->Misc->RunBinary(content, size, Services);
+		char* bf = content;
+		bf[size] = 0;
+		InternalExecuteScript(bf);
         Services->Memory->FreePool(content);
         Services->File->CloseFile(OtherFile);
     }
     else 
     {
         Services->Memory->FreePool(content);
-        return OpenFileBin;
+        return OpenInitScript;
     }
 
 }

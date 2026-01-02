@@ -12,6 +12,28 @@ start:
 	jmp pre_c_boot_stage1		; stub para el no se que
 	hlt							; por si acaso
 
+global isr_keyboard_stub
+extern keyboard_handler
+isr_keyboard_stub:
+	; guardar
+    pusha                           ; guardar todos los generales
+    push ds                         ; guardar ds
+    push es                         ; guardar es
+    push fs                         ; guardar fs
+    push gs                         ; guardar gs
+
+    push esp                        ; ponerlo
+    call keyboard_handler
+    add esp, 4                      ; vaciar la pila
+
+    ; recuperar
+    pop gs                          ; recuperar gs
+    pop fs                          ; recuperar fs
+    pop es                          ; recuperar es
+    pop ds                          ; recuperar ds
+    popa                            ; recuperar los generales
+    iret
+
 ; etapa 2 donde se hace todo lo de mas bajo nivel
 pre_c_boot_stage1:
 	; etapa pre-prematura, aqui se configura todo y las tareas de bajo nivel
@@ -21,7 +43,6 @@ pre_c_boot_stage1:
 	mov byte [InternalBStg], 1	;  etapa = first
 
 	; funciones de estandart
-    cli							; desactivar interrupciones
 	jmp pre_c_boot_stage2		; cambiar de etapa
 	hlt							; por si acaso
 
@@ -87,4 +108,5 @@ kernel_ended:
 
 	; detencion estandart
 	call InternalKernelHaltReal	; si algo sale mal congelar
+    cli							; desactivar interrupciones
 	hlt							; por que pasara esto, bueno esta por si acaso

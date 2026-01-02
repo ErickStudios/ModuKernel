@@ -11,10 +11,12 @@
 /kernel/init;AC1;BIN;
 /kernel/modush;AC2;BIN;
 /dev/mps2;DV0;BIN;
-/dev/pci;DV1;BIN;
-/dev/drv0;DV2;BIN;
+/dev/mups2;DV1;BIN;
+/dev/pci;DV2;BIN;
+/dev/drv0;DV3;BIN;
 /sys/help;SY0;BIN;
 /sys/frcache.sh;SH0;NSH;
+/sys/init.sh;SH1;NSH;
 /home/myScript.sh;SR0;SRN;
 /home/nota.txt;SR1;SRN;
 /home/test1.txt;SR2;SRN;

@@ -11,6 +11,9 @@ struct _Menu;
 struct _MouseState;
 struct _DesktopContext;
 
+void mouse_init();
+void MouseDeinit();
+
 /* para salir */
 Mini Salir = 0;
 
@@ -73,7 +76,35 @@ void ExecuteAction(char* action)
     {
         string Command = Splited[i];
 
-        if (StrCmp(Command, "exitenv") == 0) Salir = 1;
+        if (StrCmp(Command, "exitenv") == 0) 
+        {
+            MouseDeinit();
+            Salir = 1;
+        }
+        else if (StrCmp(Command, "shell") == 0)
+        {
+            MouseDeinit();
+
+            FatFile OtherFile = gSys->File->OpenFile("/kernel/modush");
+
+            void* content; int size;
+
+            KernelStatus OpenFileBin = gSys->File->GetFile(OtherFile, &content, &size);
+
+            // ejecutar
+            if (!(_StatusError(OpenFileBin)))
+            {
+                gSys->Misc->RunBinary(content, size, gSys);
+                gSys->Memory->FreePool(content);
+                gSys->File->CloseFile(OtherFile);
+            }
+            else 
+            {
+                gSys->Memory->FreePool(content);
+                return OpenFileBin;
+            }
+            mouse_init();
+        }
         gSys->Misc->Run(gSys, Command, 0);
     }
 
@@ -239,6 +270,27 @@ void mouse_write(uint8_t val) {
 uint8_t mouse_read() {
     while (!(gIOS->Input(0x64) & 0x01));
     return gIOS->Input(0x60);
+}
+// leer respuesta del mouse
+uint8_t MouseRead() {
+    while (!(gIOS->Input(0x64) & 0x01));
+    return gIOS->Input(0x60);
+}
+
+// desinicializar mouse
+void MouseDeinit() {
+    // deshabilitar dispositivo secundario (mouse)
+    gIOS->Outpud(0x64, 0xA7);
+
+    // deshabilitar interrupciones del mouse
+    gIOS->Outpud(0x64, 0x20);
+    uint8_t status = gIOS->Input(0x60) & ~2;
+    gIOS->Outpud(0x64, 0x60);
+    gIOS->Outpud(0x60, status);
+
+    // desactivar reporte de datos
+    mouse_write(0xF5);
+    mouse_read(); // esperar ACK
 }
 
 // inicializar mouse

@@ -13,6 +13,9 @@
 // incluir funciones de la libreria c de bajo nivel
 #include "../libc/String.h"
 
+// manejador de excepciones
+ObjectAny ExceptionHandlePtr;
+
 // servicios globales
 KernelServices* GlobalServices;
 
@@ -27,11 +30,11 @@ KernelServices* GlobalServices;
 #include "../handlers/exceptions.h"
 #include "../syscalls/syscall.h"
 
+// incluir las teclas
+#include "key.h"
+
 // el comando de debug
 bool ActivatedCommandDebug = 0;
-
-// manejador de excepciones
-ObjectAny ExceptionHandlePtr;
 
 // mayusculas y minusculas
 bool LowerUpper = 0;
@@ -86,6 +89,32 @@ void InternalSendCharToSerialFy(char ch) {
     // enviar carácter
     outb(0x3F8, (uint8_t)ch);
 }
+extern void isr_keyboard_stub();
+static void pic_remap(void) {
+    // ICW1: iniciar
+    outb(0x20, 0x11); // PIC maestro
+    outb(0xA0, 0x11); // PIC esclavo
+
+    // ICW2: offset de vectores
+    outb(0x21, 0x20); // maestro: 0x20
+    outb(0xA1, 0x28); // esclavo: 0x28
+
+    // ICW3: encadenamiento
+    outb(0x21, 0x04); // esclavo conectado al IRQ2 del maestro
+    outb(0xA1, 0x02); // este esclavo es línea 2
+
+    // ICW4: modo 8086
+    outb(0x21, 0x01);
+    outb(0xA1, 0x01);
+
+    // Enmascarar todo inicialmente
+    outb(0x21, 0xFF);
+    outb(0xA1, 0xFF);
+}
+static void pic_unmask_irq1(void) {
+    uint8_t imr = inb(0x21);      // PIC maestro
+    outb(0x21, imr & ~0x02);      // desmascara bit 1 (IRQ1)
+}
 void idt_init() {
     idt_ptr.limit = sizeof(idt) - 1;
     idt_ptr.base  = (uint32_t)&idt;
@@ -103,6 +132,9 @@ void idt_init() {
 
 	// llamadas
 	set_idt_entry(0x80, (uint32_t)IdtSystemCall, 0x08, 0x8E);
+
+	// teclado
+	set_idt_entry(0x21, (uint32_t)isr_keyboard_stub,  0x08, 0x8E);
 
     // cargar IDT
     asm volatile("lidt %0" :: "m"(idt_ptr));
@@ -945,13 +977,13 @@ unsigned char InternalKeyboardReadChar()
 	// esperar
 	while(1) {
 		// estado
-		uint8_t status = inb(0x64);
+        waitforkey();
+
+        uint8_t scancode = readkey();
+        if (scancode == 0) continue;
 
 		// si es verdadero
-		if(status & 0x01) {
-			// codigo de escaneo
-			uint8_t scancode = inb(0x60);
-
+		if(1) {
 			// caracter
 			char character = 0;
 
@@ -1045,13 +1077,7 @@ unsigned char InternalKeyboardReadChar()
 
 }
 unsigned char InternalKeyboardReadCharNonBlocking() {
-    uint8_t status = inb(0x64);
-
-    if (!(status & 0x01)) {
-        return 0; // no hay tecla disponible
-    }
-
-    uint8_t scancode = inb(0x60);
+    uint8_t scancode = readkey();
     static int extended = 0;
     char character = 0;
 
@@ -2293,6 +2319,15 @@ void InternalSysCommandExecute(KernelServices* Services, char* command, int lena
 }
 void k_main() 
 { 
+
+	// etapa muy temprana de c
+	
+	pic_remap();
+	idt_init();        
+	pic_unmask_irq1(); 
+
+	asm volatile("sti");
+
 	InternalDebug("ModuKernel Debug Console\n\nBienvenido a la consola de desarrollo de tu kernel basado en ModuKernel, aqui veras las noticias que mande tu sistema operativo en tiempo real, puede tambien proximamente mandar acciones al kernel y interrumpir\n");
 
 	// debuggear

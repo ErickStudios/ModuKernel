@@ -93,7 +93,7 @@ config_mode:
 	AjustarCrtc 0x0F, 0x00
 
 	; retrazo vertical
-	AjustarCrtc 0x10, 0x11C		; inicio del retrazo vertical
+	AjustarCrtc 0x10, 0x12C		; inicio del retrazo vertical
 	AjustarCrtc 0x11, 0xFF		; fin del retrazo vertical
 	AjustarCrtc 0x12, 0xFF		; fin del display vertical
 

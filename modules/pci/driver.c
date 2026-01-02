@@ -21,10 +21,11 @@ typedef enum _ActionDriver {
 /* entrada */
 KernelStatus ErickMain(KernelServices* Services)
 {
-    // informacion
+    // informacion 
     ActionDriver DriverFunction = Services->Info->DriverParams[0];
     uint32_t* OutParam          = (uint32_t*)((uintptr_t)(Services->Info->DriverParams[1]));
 
+    // funcion para leer un driver de PCi
     if (DriverFunction == DriverPciReadConfig)
         *OutParam = pci_read_config(
             (uint8_t)Services->Info->DriverParams[2],
@@ -32,6 +33,7 @@ KernelStatus ErickMain(KernelServices* Services)
             (uint8_t)Services->Info->DriverParams[4],
             (uint8_t)Services->Info->DriverParams[5]
         );
+    // funcion para escribir un driver PCi
     else if (DriverFunction == DriverPciWriteConfig)
         pci_write_config(
             (uint8_t)Services->Info->DriverParams[2],
