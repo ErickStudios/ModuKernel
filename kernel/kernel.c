@@ -81,6 +81,8 @@ extern function InternalKernelHaltReal();
 
 // incluir las teclas
 #include "key.h"
+// incluir paquetes
+#include "packages.h"
 
 uint32_t PitCounter = 0;
 
@@ -94,9 +96,10 @@ void InternalSendCharToSerialFy(char ch) {
 extern void isr_keyboard_stub();
 extern void isr_idt_stub();
 void pic_handler(regs_t* r) {
+	// contador mas
 	PitCounter++;
-
-    outb(0x20, 0x20); // EOI
+	// interrupcion terminada
+    outb(0x20, 0x20); 
 }
 static void pic_remap(void) {
     // ICW1: iniciar
@@ -356,6 +359,7 @@ void DrawLetterOffset(int x, int y, char letter, uint8_t color, int ofX, int OfY
 		DrawBitmap(lleno_bitmap, realx, realy, color);
 		DrawBitmap(lleno_bitmap, realx + 1, realy, color);
 	}
+	else if (letter == (0xC0 | 1)) DrawBitmap(upidk_bitmap, realx, realy, color);
 }
 void DrawLetter(int x, int y, char letter, uint8_t color)
 {
@@ -1188,6 +1192,7 @@ void InitializeKernel(KernelServices* Services)
     TimeServices* 		Tim 	= AllocatePool(sizeof(TimeServices));
     MusicServices* 		Music 	= AllocatePool(sizeof(MusicServices));
 	KernelSystemInfo* 	Info 	= AllocatePool(sizeof(KernelSystemInfo));
+	PackageServices*	Pkg		= AllocatePool(sizeof(PackageServices));
 
     // comprobar allocs
     if (!Dsp || !Mem || !IO || !Dsk || !Msc) {
@@ -1215,7 +1220,8 @@ void InitializeKernel(KernelServices* Services)
 	Services->Time			= Tim;
 	Services->Music			= Music;
 	Services->Info			= Info;
-
+	Services->Packages		= Pkg;
+	
     // servicios principales
     Services->Misc->Run       = &InternalSysCommandExecute;
 	Services->Misc->Reset	  = &InternalKernelReset;
@@ -1287,6 +1293,10 @@ void InitializeKernel(KernelServices* Services)
 	Info->ModuWorldPtr  = ((uint8_t*)0x0AFB032C);
 	Info->ProgramSizePtr= &ProgramMainSize;
 	Info->VideoMemPtr	= ((uint8_t*)0xb8000);
+
+	// paquetes
+	Pkg->Launch			= &InternalPackageLaunch;
+	Pkg->Catch			= &InternalPackageCatch;
 
     // hacer global la estructura principal
     GlobalServices = Services;
@@ -2345,11 +2355,17 @@ void k_main()
 	// activar interrupciones
 	asm volatile("sti");
 
-	InternalPrintg("Boot From:",0);
-	InternalPrintg("a) Hard Disk",2);
-	InternalPrintg("b) Floppy Disk",3);
-	InternalPrintg("c) CD-ROM",4);
-	InternalPrintg("Enter key for chose the Hard Disk",6);
+	InternalPrintg(
+		" __  __         _      _  __                 _ \n"
+		"|  \\/  |___  __| |_  _| |/ /___ _ _ _ _  ___| |\n"
+		"| |\\/| / _ \\/ _` | || | ' </ -_) '_| ' \\/ -_) |\n"
+		"|_|  |_\\___/\\__,_|\\_,_|_|\\_\\___|_| |_||_\\___|_|"
+,0);
+	InternalPrintg("Boot From:",5);
+	InternalPrintg("a) Hard Disk",7);
+	InternalPrintg("b) Floppy Disk",8);
+	InternalPrintg("c) CD-ROM",9);
+	InternalPrintg("Enter key for chose the Hard Disk",11);
 
 	char Option = 0;
 

@@ -8,6 +8,7 @@
 #include "DiskServices.h"
 #include "TimeServices.h"
 #include "MusicServices.h"
+#include "PackageServices.h"
 /* codigos de error entre otros */
 typedef enum _KernelStatus {
     /* se puede */
@@ -132,5 +133,7 @@ typedef struct _KernelServices {
     MusicServices* Music;
     /* informacion del sistema */
     KernelSystemInfo* Info;
+    /* paquetes */
+    PackageServices* Packages;
 } KernelServices;
 #endif

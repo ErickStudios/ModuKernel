@@ -28,12 +28,12 @@ KernelStatus ErickMain(KernelServices* Services)
     uint8_t Offset = (uint8_t)(HexStringToInt((char*)Services->Misc->Paramaters[4 + 2]));
     
     // parametros
-    Services->Info->DriverParams[0] = 0;                    // accion : obtener
-    Services->Info->DriverParams[1] = &ValuePciConfig;      // donde lo retornara
-    Services->Info->DriverParams[2] = PciBus;               // el bus
-    Services->Info->DriverParams[3] = Device;               // el dispositivo
-    Services->Info->DriverParams[4] = Function;             // la funcion
-    Services->Info->DriverParams[5] = Offset;               // el offset
+    Services->Packages->Launch(KPackageToDriver, 0);                // accion: obtener
+    Services->Packages->Launch(KPackageToDriver, &ValuePciConfig);  // donde lo retorna
+    Services->Packages->Launch(KPackageToDriver, PciBus);           // el bus
+    Services->Packages->Launch(KPackageToDriver, Device);           // el dispositivo
+    Services->Packages->Launch(KPackageToDriver, Function);         // la funcion
+    Services->Packages->Launch(KPackageToDriver, Offset);           // el offset
 
     // ejecutar el driver
     Services->Misc->RunBinary(PciDriverBin, PciDriverBinSize, Services);

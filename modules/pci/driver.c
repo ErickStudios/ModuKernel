@@ -21,25 +21,32 @@ typedef enum _ActionDriver {
 /* entrada */
 KernelStatus ErickMain(KernelServices* Services)
 {
+    KernelPackage Pkg5 = Services->Packages->Catch();
+    KernelPackage Pkg4 = Services->Packages->Catch();
+    KernelPackage Pkg3 = Services->Packages->Catch();
+    KernelPackage Pkg2 = Services->Packages->Catch();
+    KernelPackage Pkg1 = Services->Packages->Catch();
+    KernelPackage Pkg0 = Services->Packages->Catch();
+
     // informacion 
-    ActionDriver DriverFunction = Services->Info->DriverParams[0];
-    uint32_t* OutParam          = (uint32_t*)((uintptr_t)(Services->Info->DriverParams[1]));
+    ActionDriver DriverFunction = (ActionDriver)Pkg0.Data;
+    uint32_t* OutParam          = (uint32_t*)((uintptr_t)(Pkg1.Data));
 
     // funcion para leer un driver de PCi
     if (DriverFunction == DriverPciReadConfig)
         *OutParam = pci_read_config(
-            (uint8_t)Services->Info->DriverParams[2],
-            (uint8_t)Services->Info->DriverParams[3], 
-            (uint8_t)Services->Info->DriverParams[4],
-            (uint8_t)Services->Info->DriverParams[5]
+            (uint8_t)Pkg2.Data,
+            (uint8_t)Pkg3.Data, 
+            (uint8_t)Pkg4.Data,
+            (uint8_t)Pkg5.Data
         );
     // funcion para escribir un driver PCi
     else if (DriverFunction == DriverPciWriteConfig)
         pci_write_config(
-            (uint8_t)Services->Info->DriverParams[2],
-            (uint8_t)Services->Info->DriverParams[3], 
-            (uint8_t)Services->Info->DriverParams[4],
-            (uint8_t)Services->Info->DriverParams[5],
+            (uint8_t)Pkg2.Data,
+            (uint8_t)Pkg3.Data, 
+            (uint8_t)Pkg4.Data,
+            (uint8_t)Pkg5.Data,
             *OutParam
         );
 

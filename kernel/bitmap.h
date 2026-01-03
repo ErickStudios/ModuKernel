@@ -820,4 +820,14 @@ unsigned char lleno_bitmap[7] = {
 
 };
 
+unsigned char upidk_bitmap[7] = {
+    0b000000, //
+	0b001000,
+	0b011100,
+	0b011100,
+	0b011100,
+	01011010,
+	0b000000,
+};
+
 #endif
