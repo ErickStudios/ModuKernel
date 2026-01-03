@@ -1,4 +1,4 @@
-![ModuKernel](./assets/logo.svg)
+![ModuKernel](./assets/Logo.svg)
 
 | Que / Arquitectura   | i386                           | Comentario                               |
 | -------------------- | ------------------------------ | ---------------------------------------- |
