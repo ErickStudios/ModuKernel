@@ -30,6 +30,9 @@ KernelServices* GlobalServices;
 #include "../handlers/exceptions.h"
 #include "../syscalls/syscall.h"
 
+// offset
+KernelDateTime TimeOffset;
+
 // el comando de debug
 bool ActivatedCommandDebug = 0;
 
@@ -73,6 +76,8 @@ extern function InternalDrawBackground(uint8_t Color);
 extern function InternalGopScreenInit();
 extern function InternalSendCharToSerial(char ch);
 extern function InternalKernelHaltReal();
+extern function isr_keyboard_stub();
+extern function isr_idt_stub();
 
 // pit
 #define PIT_FREQUENCY     1193182
@@ -93,8 +98,6 @@ void InternalSendCharToSerialFy(char ch) {
     // enviar carácter
     outb(0x3F8, (uint8_t)ch);
 }
-extern void isr_keyboard_stub();
-extern void isr_idt_stub();
 void pic_handler(regs_t* r) {
 	// contador mas
 	PitCounter++;
@@ -119,7 +122,7 @@ static void pic_remap(void) {
     outb(0xA1, 0x01);
 
     // Enmascarar todo inicialmente
-    outb(0x21, 0x11111100);
+    outb(0x21, 0b11111100);
     outb(0xA1, 0xFF);
 }
 static void pic_unmask_irq1(void) {
@@ -252,8 +255,8 @@ void InternalBlitingRectangle(uint8_t color, int x, int y, int SizeX, int SizeY)
 }
 void InternalKernelHalt()
 {
-	// no se puede en modo usuario
-	if (MemoryCurrentSystem == MemAllocTypePrograms || MemoryCurrentSystem == MemAllocTypeProgramsStackMemory) return;
+	// no se puede en modo usuario/proceso, osea solo de C para abajo
+	if (!(InternalRingLevel < 2)) return;
 
 	// llamar a halt
 	InternalKernelHaltReal();
@@ -510,18 +513,64 @@ void PrintStatus(KernelServices* Services, char* status, char* text)
 	Services->Display->printg(text);
 }
 void InternalGetDateTime(KernelDateTime* Time) {
-	// segundo
-    Time->second = BCDtoBin(ReadRTC(0x00));
-	// minuto
-    Time->minute = BCDtoBin(ReadRTC(0x02));
-	// hora
-    Time->hour   = BCDtoBin(ReadRTC(0x04));
-	// dia
-    Time->day    = BCDtoBin(ReadRTC(0x07));
-	// mes
-    Time->month  = BCDtoBin(ReadRTC(0x08));
-	// año
-    Time->year   = 2000 + BCDtoBin(ReadRTC(0x09));
+    // Leer valores base del RTC
+    int sec   = BCDtoBin(ReadRTC(0x00));
+    int min   = BCDtoBin(ReadRTC(0x02));
+    int hour  = BCDtoBin(ReadRTC(0x04));
+    int day   = BCDtoBin(ReadRTC(0x07));
+    int month = BCDtoBin(ReadRTC(0x08));
+    int year  = 2000 + BCDtoBin(ReadRTC(0x09));
+
+    // Aplicar offset
+    sec   += TimeOffset.second;
+    min   += TimeOffset.minute;
+    hour  += TimeOffset.hour;
+    day   += TimeOffset.day;
+    month += TimeOffset.month;
+    year  += TimeOffset.year;
+
+    // Normalizar segundos → minutos
+    if (sec >= 60) { min += sec / 60; sec %= 60; }
+    if (sec < 0)   { min += (sec / 60) - 1; sec = 60 + (sec % 60); }
+
+    // Normalizar minutos → horas
+    if (min >= 60) { hour += min / 60; min %= 60; }
+    if (min < 0)   { hour += (min / 60) - 1; min = 60 + (min % 60); }
+
+    // Normalizar horas → días
+    if (hour >= 24) { day += hour / 24; hour %= 24; }
+    if (hour < 0)   { day += (hour / 24) - 1; hour = 24 + (hour % 24); }
+
+    // Normalizar días → meses (simplificado, sin calendario real)
+    static const int days_in_month[12] = {
+        31,28,31,30,31,30,31,31,30,31,30,31
+    };
+    // Ajustar febrero si es año bisiesto
+    int dim = days_in_month[(month-1) % 12];
+    if ((month == 2) && ((year % 4 == 0 && year % 100 != 0) || (year % 400 == 0))) {
+        dim = 29;
+    }
+
+    while (day > dim) {
+        day -= dim;
+        month++;
+        if (month > 12) { month = 1; year++; }
+        dim = days_in_month[(month-1) % 12];
+    }
+    while (day <= 0) {
+        month--;
+        if (month < 1) { month = 12; year--; }
+        dim = days_in_month[(month-1) % 12];
+        day += dim;
+    }
+
+    // Guardar resultado
+    Time->second = sec;
+    Time->minute = min;
+    Time->hour   = hour;
+    Time->day    = day;
+    Time->month  = month;
+    Time->year   = year;
 }
 void InternalWaitEticks(int Unities)
 {
@@ -559,7 +608,7 @@ void InitHeap()
 
     free_list = first;
 }
-KernelStatus InternalFloppyDiskReadSector(unsigned int lba, unsigned char* buffer_phys /* debe ser física y <1MiB */)
+KernelStatus InternalFloppyDiskReadSector(unsigned int lba, unsigned char* buffer_phys)
 {
     // 1. LBA -> CHS
     unsigned int cyl = lba / (2 * 18);
@@ -1018,7 +1067,7 @@ unsigned char InternalKeyboardReadChar()
 			else if(scancode == 0x09) character = LowerUpper ? '(' : '8';
 			else if(scancode == 0x0A) character = LowerUpper ? ')' : '9';
 			else if(scancode == 0x0B) character = LowerUpper ? '=' : '0';
-			else if(scancode == 0x0C) character = LowerUpper ? '?' : '\'';
+			else if(scancode == 0x0C) character = LowerUpper ? '_' : '-';
 			else if(scancode == 0x0D) character = LowerUpper ? ' ' : '!';
 			else if(scancode == 0x1A) character = LowerUpper ? '{' : '[';
 			else if(scancode == 0x1B) character = LowerUpper ? '}' : ']';
@@ -1672,11 +1721,6 @@ void InternalSysCommandExecute(KernelServices* Services, char* command, int lena
 
 	if (StrCmp(command, "cls") == 0) Services->Display->clearScreen();
 	else if (command[0] == '#') return;
-	else if (StrCmp(command, "div0") == 0)
-	{
-		int eab = 10;
-		eab /= 0;
-	}
 	else if (StrnCmp(command, "cd ", 3) == 0)
 	{
 		char* directory = command + 3;
@@ -2238,6 +2282,38 @@ void InternalSysCommandExecute(KernelServices* Services, char* command, int lena
 		ActivatedCommandDebug = 1;
 	else if (StrCmp(command, "dbg /off") == 0)
 		ActivatedCommandDebug = 0;
+	else if (StrnCmp(command, "timezone ", 9) == 0)
+	{
+		char* psr = command + 9;
+
+		char* Params[128];
+		int ParamsCount = StrSplit(psr, Params, ' ');
+
+		if (ParamsCount >= 2) {
+			int Hour   = StringToInt(Params[0]);
+			int Minute = StringToInt(Params[1]);
+
+			// Normalizar valores
+			if (Minute >= 60) {
+				Hour += Minute / 60;
+				Minute %= 60;
+			}
+			if (Minute < 0) {
+				Hour += (Minute / 60) - 1;
+				Minute = 60 + (Minute % 60);
+			}
+
+			if (Hour >= 24) {
+				Hour %= 24;
+			}
+			if (Hour < 0) {
+				Hour = (24 + (Hour % 24)) % 24;
+			}
+
+			TimeOffset.hour   = Hour;
+			TimeOffset.minute = Minute;
+		}
+	}
 	else if (StrCmp(command, "ulr") == 0) 
 	{
 		char esb[30];
@@ -2355,12 +2431,15 @@ void k_main()
 	// activar interrupciones
 	asm volatile("sti");
 
+	// imprimir el logo
 	InternalPrintg(
 		" __  __         _      _  __                 _ \n"
 		"|  \\/  |___  __| |_  _| |/ /___ _ _ _ _  ___| |\n"
 		"| |\\/| / _ \\/ _` | || | ' </ -_) '_| ' \\/ -_) |\n"
 		"|_|  |_\\___/\\__,_|\\_,_|_|\\_\\___|_| |_||_\\___|_|"
-,0);
+		,0);
+
+	// opciones
 	InternalPrintg("Boot From:",5);
 	InternalPrintg("a) Hard Disk",7);
 	InternalPrintg("b) Floppy Disk",8);

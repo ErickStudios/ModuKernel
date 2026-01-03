@@ -1,7 +1,23 @@
-ModuKernel
-===============================
+![ModuKernel](./assets/logo.svg)
 
-![ModuKernel](./assets/QemuWindowWithModuKernel.png)
+| Que / Arquitectura   | i386                           | Comentario                               |
+| -------------------- | ------------------------------ | ---------------------------------------- |
+| Kernel               | ![bd](./assets/badgeds/ok.svg) | El kernel se puede compilar              |
+| Drivers              | ![bd](./assets/badgeds/ok.svg) | Los drivers funcionane excelente         |
+| Programas            | ![bd](./assets/badgeds/ok.svg) | Los programas funcionan como se esperaba |
+
+Resumen : ![bd](./assets/badgeds/ok.svg), el kernel tiene bugs en cosas muy especificas pero funciona
+
+Contenidos
+----------------------------------------
+
+* [Caracteristicas](#caracteristicas)
+    - [Compatibilidad con unidades](#compatibilidad-con-unidades)
+    - [Compatibilidad con drivers](#compatibilidad-con-drivers)
+    - [Compatibilidad con sistemas de archivos](#compatibilidad-con-sistemas-de-archivos)
+* [Detalles pequeños del sistema](#detalles-pequeños-del-sistema)
+* [Contribuciones](#contribuciones)
+    - [Ejemplos](#ejemplos)
 
 basado en: https://github.com/debashisbarman/Simple-Kernel-in-C-and-Assembly
 
@@ -20,9 +36,9 @@ por ahora estas son las unidades de almacenamiento que ofrece y estan programada
 
 | Disco | Estado  | Probado      |
 | ------------- | ------------- | ------------- |
-| HardDisk | ✅ | Es el formato original |
-| FloppyDisk | ⚠️ | Probado, funciona a medias, no soporta FSLST.IFS |
-| CD-ROM | ⚠️ | No garantizado |
+| HardDisk | ![bd](./assets/badgeds/ok.svg) | Es el formato original |
+| FloppyDisk | ![bd](./assets/badgeds/bugs.svg) | Probado, funciona a medias, no soporta FSLST.IFS |
+| CD-ROM | ![bd](./assets/badgeds/bugs.svg)  | No garantizado |
 
 ## Compatibilidad con drivers
 
@@ -30,10 +46,12 @@ por ahora estos son los drivers probados y que funcionan a medias
 
 | Driver | Estado | Probado      |
 | ------------- | ------------- | ------------- |
-| Teclado | ✅ | Soporte primitivo, estable |
-| Mouse | ⚠️ | Soporte adicional, solo con funciones externas al kernel, inestable |
-| VGA (Modo texto) | ✅ | Soporte primitivo, estable |
-| VGA (Modo grafico) | ✅ | Soporte como plus |
+| Teclado | ![bd](./assets/badgeds/ok.svg) | Soporte primitivo, estable |
+| Pci | ![bd](./assets/badgeds/ok.svg) | Soporte plus, usa un driver `/dev/pci` |
+| Mouse | ![bd](./assets/badgeds/bugs.svg) | Soporte adicional, solo con funciones externas al kernel, inestable |
+| VGA (Modo texto) | ![bd](./assets/badgeds/ok.svg) | Soporte primitivo, estable |
+| VGA (Modo grafico) | ![bd](./assets/badgeds/ok.svg) | Soporte como plus |
+| Sonido | ![bd](./assets/badgeds/ok.svg) | Soporte primitivo, usa el buzzer para generar sonidos |
 
 ## Compatibilidad con sistemas de archivos
 
@@ -41,7 +59,7 @@ por ahora solo se permite FAT12 pero puede extenderlo y volverlo mas complejo a�
 
 | Sistema de archivos | Estado | Probado      |
 | ------------- | ------------- | ------------- |
-| FAT12 | ✅ | Soporte primitivo, estable |
+| FAT12 | ![bd](./assets/badgeds/ok.svg) | Soporte primitivo, estable |
 
 # Detalles pequeños del sistema
 
@@ -62,7 +80,7 @@ Puede hacer lo siguiente para contribuir
 * Puede hacer programas para el sistema
 * Puede crear scripts utiles
 
-# Ejemplos
+## Ejemplos
 
 Un ejemplo como base para estas contribuciones puede ser
 ```c
