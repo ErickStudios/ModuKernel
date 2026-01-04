@@ -2,11 +2,12 @@
 /bin/calculator;BC1;BIN;
 /bin/desktop;BC2;BIN;
 /bin/getpci;BC3;BIN;
-/bin/helloworld;BC4;BIN;
-/bin/mouse;BC5;BIN;
-/bin/multi;BC6;BIN;
-/bin/piano;BC7;BIN;
-/bin/trivia;BC8;BIN;
+/bin/gfx;BC4;BIN;
+/bin/helloworld;BC5;BIN;
+/bin/mouse;BC6;BIN;
+/bin/multi;BC7;BIN;
+/bin/piano;BC8;BIN;
+/bin/trivia;BC9;BIN;
 /kernel/denv;AC0;BIN;
 /kernel/init;AC1;BIN;
 /kernel/modush;AC2;BIN;

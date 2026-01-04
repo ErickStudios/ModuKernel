@@ -199,15 +199,19 @@ void InternalDecodeErickColor(uint8_t code, uint8_t out[4]) {
 
     // Escalar a 0–255
     uint8_t factor = ll + 1; // brillo como multiplicador
-    out[0] = rr * 85 * factor; // R
-    out[1] = gg * 85 * factor; // G
-    out[2] = bb * 85 * factor; // B
+
+	uint8_t base = (ll == 0 ? 21 : (ll == 1 ? 42 : (ll == 2 ? 63 : 84)));
+
+    out[0] = (rr * base * factor); // R
+    out[1] = (gg * base * factor); // G
+    out[2] = (bb * base * factor); // B
+
     out[3] = ll;               // brillo (opcional)
 }
 extern void SetPaletteColor(char index, char r, char g, char b);
 void ColorLoopSystem()
 {
-	for (int i = 0; i < 255; i++)
+	for (int i = 0; i < 256; i++)
 	{
 		uint8_t Color = (uint8_t)i;
 		uint8_t lrgb[4];	// ligth/red/green/blue
@@ -404,6 +408,9 @@ void DrawLetterOffset(int x, int y, char letter, uint8_t color, int ofX, int OfY
 	else if (letter == '7') DrawBitmap(num7_bitmap, realx, realy, color);
 	else if (letter == '8') DrawBitmap(num8_bitmap, realx, realy, color);
 	else if (letter == '9') DrawBitmap(num9_bitmap, realx, realy, color);
+	else if (letter == '.') DrawBitmap(dot_bitmap, realx, realy, color);
+	else if (letter == ',') DrawBitmap(comma_bitmap, realx, realy, color);
+	else if (letter == '-') DrawBitmap(minussim_bitmap, realx, realy, color);
 	else if (letter == '\a') {
 		DrawBitmap(lleno_bitmap, realx, realy - 1, color);
 		DrawBitmap(lleno_bitmap, realx + 1, realy - 1, color);
@@ -645,37 +652,37 @@ uint8_t InternalTextModeToVga(uint8_t attr)
 	switch (attr)
 	{
 	case 0x0:
-		return InternalLrgbToVga(0,0,0,0);
+		return InternalLrgbToVga(32,0,0,0);
 	case 0x1:
-		return InternalLrgbToVga(0,0,0,255);
+		return InternalLrgbToVga(32,0,0,128);
 	case 0x2:
-		return InternalLrgbToVga(0,0,255,0);
+		return InternalLrgbToVga(32,0,128,0);
 	case 0x3:
-		return InternalLrgbToVga(0,0,255,255);
+		return InternalLrgbToVga(32,0,128,128);
 	case 0x4:
-		return InternalLrgbToVga(0,255,0,0);
+		return InternalLrgbToVga(32,128,0,0);
 	case 0x5:
-		return InternalLrgbToVga(0,255,0,255);
+		return InternalLrgbToVga(32,128,0,128);
 	case 0x6:
-		return InternalLrgbToVga(0,255,255,0);
+		return InternalLrgbToVga(32,128,128,0);
 	case 0x7:
-		return InternalLrgbToVga(0,255,255,255);
+		return InternalLrgbToVga(32,128,128,128);
 	case 0x8:
-		return InternalLrgbToVga(0,0,0,0);
+		return InternalLrgbToVga(32,0,0,0);
 	case 0x9:
-		return InternalLrgbToVga(255,64,64,255);
+		return InternalLrgbToVga(256,64,64,255);
 	case 0xA:
-		return InternalLrgbToVga(255,0,255,64);
+		return InternalLrgbToVga(256,0,255,64);
 	case 0xB:
-		return InternalLrgbToVga(255,0,255,255);
+		return InternalLrgbToVga(256,0,255,255);
 	case 0xC:
-		return InternalLrgbToVga(255,255,0,0);
+		return InternalLrgbToVga(256,255,0,0);
 	case 0xD:
-		return InternalLrgbToVga(255,255,0,255);
+		return InternalLrgbToVga(256,255,0,255);
 	case 0xE:
-		return InternalLrgbToVga(255,255,255,0);
+		return InternalLrgbToVga(256,255,255,0);
 	case 0xF:
-		return InternalLrgbToVga(255,255,255,255);
+		return InternalLrgbToVga(256,255,255,255);
 	default:
 		return 0;
 	}
@@ -2174,9 +2181,22 @@ void InternalSysCommandExecute(KernelServices* Services, char* command, int lena
 		Services->Display->ActivatePixel();
 
 		Services->Display->setAttrs(2, 7);
-		DrawLetter(0,0, 'C', 15);
-		DrawLetter(1,0, 'c', 15);
-		DrawLetter(2,0, 'c', 15);
+
+		uint8_t Sms = 0;
+
+		for (size_t i = 0; i < 160; i++)
+		{
+			Sms = 0;
+			for (size_t j = 0; j < 256; j++)
+			{
+				InternalDrawPixel(Sms,((i * 255) + Sms),0);
+				Sms++;
+			}
+		}
+
+		Services->Time->TaskDelay(40);
+		Services->InputOutput->WaitKey();
+		
 	}
 	else if (StrCmp(command, "modupanic") == 0) InternalModuPanic(KernelStatusSuccess);
 	else if (StrCmp(command, "") == 0);

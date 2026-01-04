@@ -830,4 +830,34 @@ unsigned char upidk_bitmap[7] = {
 	0b000000,
 };
 
+unsigned char dot_bitmap[7] = {
+    0b000000, //
+	0b000000,
+	0b000000,
+	0b000000,
+	0b000000,
+	00011000,
+	0b010000,
+};
+
+unsigned char comma_bitmap[7] = {
+    0b000000, //
+	0b000000,
+	0b000000,
+	0b000000,
+	0b000000,
+	00011000,
+	0b111000,
+};
+
+unsigned char minussim_bitmap[7] = {
+    0b000000, //
+	0b000000,
+	0b000000,
+	0b111110,
+	0b000000,
+	0b000000,
+	0b000000,
+};
+
 #endif
