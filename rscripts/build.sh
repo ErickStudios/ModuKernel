@@ -162,6 +162,9 @@ for file in usr/*; do
     let afaf=afaf+1
 done
 
+python rscripts/moducraw.py modules/init/image_array.h disk/LOGOK.BMP
+echo "/kernel/logo.bmp;LOGOK;BMP;" >> disk/FSLST.IFS
+
 echo "/fs.struct;FSLST;IFS;" >> disk/FSLST.IFS
 
 # haciendo el fs

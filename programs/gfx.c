@@ -62,5 +62,20 @@ KernelStatus ErickMain(KernelServices* Services)
         else if (i == 5) Color = (MiniPositivo)StringToInt(arg);
     }
 
-    return DrawPixelScreen(Services->Display, XPos, YPos, XSize, YSize, Color);
+    while (1)
+    {
+        char key = Services->InputOutput->ReadKey();
+
+        if (key == 'a') Color--;
+        else if (key == 'b') Color++;
+        else if (key == 'x') break;
+
+        DrawPixelScreen(Services->Display, 0,0, 10, 10, Color);
+    }
+
+    char bf[30];
+    IntToString((int)Color, bf);
+
+    Services->Display->clearScreen();
+    Services->Display->printg(bf);
 }

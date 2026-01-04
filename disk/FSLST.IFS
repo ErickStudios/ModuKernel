@@ -11,10 +11,11 @@
 /kernel/denv;AC0;BIN;
 /kernel/init;AC1;BIN;
 /kernel/modush;AC2;BIN;
-/dev/mps2;DV0;BIN;
-/dev/mups2;DV1;BIN;
-/dev/pci;DV2;BIN;
-/dev/drv0;DV3;BIN;
+/dev/modubmp;DV0;BIN;
+/dev/mps2;DV1;BIN;
+/dev/mups2;DV2;BIN;
+/dev/pci;DV3;BIN;
+/dev/drv0;DV4;BIN;
 /sys/help;SY0;BIN;
 /sys/frcache.sh;SH0;NSH;
 /sys/init.sh;SH1;NSH;
@@ -25,4 +26,5 @@
 /home/test3.txt;SR4;SRN;
 /home/test4.txt;SR5;SRN;
 /home/test5.txt;SR6;SRN;
+/kernel/logo.bmp;LOGOK;BMP;
 /fs.struct;FSLST;IFS;

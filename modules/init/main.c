@@ -8,6 +8,7 @@ ModuKernel que esta definida en modules/shell/main.c */
 // incluir libreria
 #include "../../library/lib.h"
 #include "serial.h"
+#include "../../library/modubmp.h"
 
 /* ejecutor */
 void InternalExecuteScript(char* buffer)
@@ -91,7 +92,7 @@ void InternalExecuteScript(char* buffer)
 	}
 }
 
-void DrawImage(int x, int y, int wd, unsigned char img[], int size, uint8_t chroma, int range)
+void DrawImage(int x, int y, int wd, unsigned char* img, int size, uint8_t chroma, int range)
 {
     int xM = x;
     int yM = y;
@@ -145,6 +146,16 @@ KernelStatus ErickMain(KernelServices *Services)
 
 	Services->Display->ActivatePixel();
 
+	FatFile ImageLogo = Services->File->OpenFile("/kernel/logo.bmp");
+	Entero ImageSize;
+	ObjectAny ImageContent;
+	KernelStatus OpenImageLogo = Services->File->GetFile(ImageLogo, &ImageContent, &ImageSize);
+	
+	struct _ImageHeader* hdr;
+	bytes raw;
+	uint32_t SizeX;
+	uint32_t SizeY;
+	GetImageThing(ImageContent, &hdr, &raw, &ImageSize, &SizeX, &SizeY);
 	// mostrar logo
 	for (int ab = 0; ab < (LogoLen * 5); ab++)
 	{
@@ -158,10 +169,15 @@ KernelStatus ErickMain(KernelServices *Services)
 
 		// setear linea actual
 
-		#include "image_array.h"
-
-		DrawImage(45,120, 70, ModuLogoImage, sizeof(ModuLogoImage), 0b11001000,IndexZone);
-
+		DrawImage(
+			45,                // X destino
+			120,               // Y destino
+			SizeX,       	   // ancho
+			raw,               // datos crudos
+			ImageSize,    	   // tamaño de los datos
+			0b11001000,        // color de fondo/transparencia
+			IndexZone          // zona destino
+		);
 		// esperar
 		Services->Time->TaskDelay(1);
 
