@@ -91,6 +91,35 @@ void InternalExecuteScript(char* buffer)
 	}
 }
 
+void DrawImage(int x, int y, int wd, unsigned char img[], int size, uint8_t chroma, int range)
+{
+    int xM = x;
+    int yM = y;
+
+    for (int i = 0; i < size; i++) {
+        uint8_t color = img[i];
+
+		char bf[20];
+		IntToString((int)color, bf);
+
+		InternalDebug(bf);
+
+        if (xM >= (x + wd)) {
+            xM = x;
+            yM++;
+        }
+
+        if (color != chroma)
+		{
+			if ((xM - x) > range && (xM - x) < range + 5)
+				gDS->DrawRectangle(1, xM, yM, 1);
+			else 
+				gDS->DrawRectangle(color, xM, yM, 1);
+		}
+        xM++;
+    }
+}
+
 /* funcion principal */
 KernelStatus ErickMain(KernelServices *Services)
 {
@@ -112,7 +141,9 @@ KernelStatus ErickMain(KernelServices *Services)
 	// logo para operaciones
 	char* LogoABCForOperations = LogoABC;
 	// longitud
-	int LogoLen = StrLen(LogoABCForOperations);
+	int LogoLen = 70;
+
+	Services->Display->ActivatePixel();
 
 	// mostrar logo
 	for (int ab = 0; ab < (LogoLen * 5); ab++)
@@ -127,25 +158,12 @@ KernelStatus ErickMain(KernelServices *Services)
 
 		// setear linea actual
 
-		Services->Display->CurrentLine = 12;
-		Services->Display->CurrentCharacter = 70;
+		#include "image_array.h"
 
-		// mostrar logo
-		for (int i = 0; i < LogoLen; i++)
-		{
-			// si esta cerca pero no en la zona ,color cyan
-			if (i == (IndexZone-1) || i == (IndexZone+1)) Services->Display->setAttrs(0, 3);
-			// si esta en la zona ,color verde
-			else if (i == IndexZone) Services->Display->setAttrs(0, 2);
-			// si no esta en el rango ,color gris
-			else Services->Display->setAttrs(0, 7);
-
-			// escritura
-			char Wrt[2] = { LogoABCForOperations[i], 0 }; Services->Display->printg(Wrt);
-		}		
+		DrawImage(45,120, 70, ModuLogoImage, sizeof(ModuLogoImage), 0b11001000,IndexZone);
 
 		// esperar
-		Services->Time->TaskDelay(2);
+		Services->Time->TaskDelay(1);
 
 		// sumar zona
 		IndexZone++;

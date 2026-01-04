@@ -30,8 +30,6 @@ KernelServices* GlobalServices;
 #include "../handlers/exceptions.h"
 #include "../syscalls/syscall.h"
 
-#include "image_array.h"
-
 char DisplayModeType = 0;
 
 // offset
@@ -287,23 +285,6 @@ void InternalBlitingRectangle(uint8_t color, int x, int y, int SizeX, int SizeY)
 	{
 		for (size_t xP = 0; xP < SizeX; xP++) InternalDrawPixel(color, (x + xP), (y + yP));
 	}
-}
-void DrawImage(int x, int y, int wd, unsigned char img[], int size)
-{
-    int xM = x;
-    int yM = y;
-
-    for (int i = 0; i < size; i++) {
-        char color = img[i];
-
-        if (xM >= (x + wd)) {
-            xM = x;
-            yM++;
-        }
-
-        InternalDrawPixel(color, xM, yM);
-        xM++;
-    }
 }
 void InternalKernelHalt()
 {
@@ -2655,7 +2636,7 @@ ChoseDiskToBoot:
 	// proteger regiones
 	InternalProtectRegion(heap_start, sizeof(heap_start), GdtLevelInRing0);
 	InternalProtectRegion(heap_ptr, sizeof(heap_ptr), GdtLevelInRing0);
-
+	
 	// esto no es otra etapa de arranque, sigue siendo la etapa de arranque normal
 	// aunque aqui se hace una animacion para que no se vea muy cutre, recuerden, pueden
 	// personalizarla si se basan en el kernel
