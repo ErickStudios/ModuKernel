@@ -27,6 +27,8 @@ typedef void (*KernelAdvancedDisplayDrawLetter)(int x, int y, char letter, uint8
 typedef uint8_t (*KernelAdvancedDisplayGetColor)(int x, int y);
 /* el tipo para dibujar */
 typedef void (*KernelAdvancedDisplayBlt)(uint8_t color, int x, int y, int SizeX, int SizeY);
+/* el tipo para colores */
+typedef uint8_t (*KernelAdvancedDisplayLrgbToVga)(uint8_t l, uint8_t r, uint8_t g, uint8_t b);
 /* el tipo de servicios de pantalla */
 typedef struct _DisplayServices {
     /* variable que contiene la linea actual donde el cursor de escritura de
@@ -100,5 +102,7 @@ typedef struct _DisplayServices {
     el segundo y tercero son la posicion X,Y de el rectangulo, el cuarto
     y quinto es el tamaño X,Y del rectangulo */
     KernelAdvancedDisplayBlt Blt;
+    /* funcion para convertir lrgb a vga */
+    KernelAdvancedDisplayLrgbToVga LrgbToVga;
 } DisplayServices;
 #endif

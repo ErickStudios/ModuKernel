@@ -1,3 +1,4 @@
+extern ColorLoopSystem
 
 ; configura el modo grafico, esto no funciona por si solo, se necesita
 ; salir entrar salir entrar y mas secuncias raras que parece que todo
@@ -164,7 +165,29 @@ config_mode:
 	mov al, 0x20			; dato
 	out dx, al				; mandar
 
+	call ColorLoopSystem	; color del loop
+
 	ret
+	
+global SetPaletteColor
+SetPaletteColor:
+    push ebp
+    mov ebp, esp
+
+    mov dx, 0x3C8
+    mov al, byte [ebp+8]    ; index
+    out dx, al
+
+    mov dx, 0x3C9
+    mov al, byte [ebp+12]   ; r
+    out dx, al
+    mov al, byte [ebp+16]   ; g
+    out dx, al
+    mov al, byte [ebp+20]   ; b
+    out dx, al
+
+    pop ebp
+    ret
 
 ; desconfiguar el modo grafico y vuelve al modo texto, bueno, se
 ; supone que debe hacer eso pero esta tan buggeado que solo sierve

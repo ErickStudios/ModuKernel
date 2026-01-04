@@ -30,6 +30,10 @@ KernelServices* GlobalServices;
 #include "../handlers/exceptions.h"
 #include "../syscalls/syscall.h"
 
+#include "image_array.h"
+
+char DisplayModeType = 0;
+
 // offset
 KernelDateTime TimeOffset;
 
@@ -186,6 +190,33 @@ void InternalProtectRegion(void* ptr, uint32_t size, enum GdtLevelIn level)
 
     set_gdt_entry(GdtSetProtectRegion++ , base, limit, access, gran);
 }
+void InternalDecodeErickColor(uint8_t code, uint8_t out[4]) {
+    // Extraer campos
+    uint8_t ll = (code >> 6) & 0x03;
+    uint8_t rr = (code >> 4) & 0x03;
+    uint8_t gg = (code >> 2) & 0x03;
+    uint8_t bb = (code >> 0) & 0x03;
+
+    // Escalar a 0–255
+    uint8_t factor = ll + 1; // brillo como multiplicador
+    out[0] = rr * 85 * factor; // R
+    out[1] = gg * 85 * factor; // G
+    out[2] = bb * 85 * factor; // B
+    out[3] = ll;               // brillo (opcional)
+}
+extern void SetPaletteColor(char index, char r, char g, char b);
+void ColorLoopSystem()
+{
+	for (int i = 0; i < 255; i++)
+	{
+		uint8_t Color = (uint8_t)i;
+		uint8_t lrgb[4];	// ligth/red/green/blue
+
+		InternalDecodeErickColor(Color, lrgb);
+
+		SetPaletteColor(Color, lrgb[0], lrgb[1], lrgb[2]);
+	}
+}
 void InternalDebug(char* str)
 {
 	char* String = str;
@@ -253,6 +284,23 @@ void InternalBlitingRectangle(uint8_t color, int x, int y, int SizeX, int SizeY)
 		for (size_t xP = 0; xP < SizeX; xP++) InternalDrawPixel(color, (x + xP), (y + yP));
 	}
 }
+void DrawImage(int x, int y, int wd, unsigned char img[], int size)
+{
+    int xM = x;
+    int yM = y;
+
+    for (int i = 0; i < size; i++) {
+        char color = img[i];
+
+        if (xM >= (x + wd)) {
+            xM = x;
+            yM++;
+        }
+
+        InternalDrawPixel(color, xM, yM);
+        xM++;
+    }
+}
 void InternalKernelHalt()
 {
 	// no se puede en modo usuario/proceso, osea solo de C para abajo
@@ -262,13 +310,13 @@ void InternalKernelHalt()
 	InternalKernelHaltReal();
 }
 void DrawBitmap( uint8_t* BitMap, int x, int y, uint8_t color) {
-    int height = 7;
-    int width  = 6;
+    int height = DisplayModeType == 1 ? 7 : 7;
+    int width  = DisplayModeType == 1 ? 10 : 6;
     for (int row = 0; row < height; row++) {
         uint8_t line = BitMap[row];
         for (int col = 0; col < width; col++) {
-            if (line & (1 << (7 - col))) {   // ← invertimos el orden
-				InternalDrawPixel(color, (x + col), y + row);
+            if (line & (1 << ((DisplayModeType == 1 ? 8 : 7) - col))) {   // ← invertimos el orden
+				InternalDrawPixel(color, (x + col) + (DisplayModeType == 1 ? ((y + row) * 320) : 0), DisplayModeType == 1 ? 0 : y + row);
             }
         }
     }
@@ -276,8 +324,8 @@ void DrawBitmap( uint8_t* BitMap, int x, int y, uint8_t color) {
 void DrawLetterOffset(int x, int y, char letter, uint8_t color, int ofX, int OfY)
 {
 
-	int realx = (x * 5) + ofX;
-	int realy = (y * 8) + OfY;
+	int realx = (x * (DisplayModeType == 1 ? 10 : 5)) + ofX;
+	int realy = (y * (DisplayModeType == 1 ? 9 : 9)) + OfY;
 
 	#include "bitmap.h"
 
@@ -578,6 +626,58 @@ void InternalWaitEticks(int Unities)
 	for (size_t i = 0; i < (5999999 * Unities); i++) { 
 		// para delay
 		int ala = ((10/2)*3); 
+	}
+}
+uint8_t InternalLrgbToVga(uint8_t l, uint8_t r, uint8_t g, uint8_t b)
+{
+    // Reducir de 0–63 a 0–3
+    uint8_t ll = l / 64;
+    uint8_t rr = r / 64;
+    uint8_t gg = g / 64;
+    uint8_t bb = b / 64;
+
+    // Empaquetar en llrrggbb
+    uint8_t result = (ll << 6) | (rr << 4) | (gg << 2) | bb;
+    return result;
+}
+uint8_t InternalTextModeToVga(uint8_t attr)
+{
+	switch (attr)
+	{
+	case 0x0:
+		return InternalLrgbToVga(0,0,0,0);
+	case 0x1:
+		return InternalLrgbToVga(0,0,0,255);
+	case 0x2:
+		return InternalLrgbToVga(0,0,255,0);
+	case 0x3:
+		return InternalLrgbToVga(0,0,255,255);
+	case 0x4:
+		return InternalLrgbToVga(0,255,0,0);
+	case 0x5:
+		return InternalLrgbToVga(0,255,0,255);
+	case 0x6:
+		return InternalLrgbToVga(0,255,255,0);
+	case 0x7:
+		return InternalLrgbToVga(0,255,255,255);
+	case 0x8:
+		return InternalLrgbToVga(0,0,0,0);
+	case 0x9:
+		return InternalLrgbToVga(255,64,64,255);
+	case 0xA:
+		return InternalLrgbToVga(255,0,255,64);
+	case 0xB:
+		return InternalLrgbToVga(255,0,255,255);
+	case 0xC:
+		return InternalLrgbToVga(255,255,0,0);
+	case 0xD:
+		return InternalLrgbToVga(255,255,0,255);
+	case 0xE:
+		return InternalLrgbToVga(255,255,255,0);
+	case 0xF:
+		return InternalLrgbToVga(255,255,255,255);
+	default:
+		return 0;
 	}
 }
 void InitHeap() 
@@ -2693,10 +2793,10 @@ void InternalPrintgNonLine(char *message)
 
 		while (message[letter])
 		{
-			if (line >= 32) {
+			if (line >= 28) {
 				char* vidmem = (char *)0xA0000;
-				InternalMemMove(vidmem, vidmem + (320 * 4), 320*200);
-				line = 31;
+				InternalMemMove(vidmem, vidmem + ((320 * 4) + 160), 320*200);
+				line = 27;
 			}
 			if (message[letter] == '\n')
 			{
@@ -2705,8 +2805,8 @@ void InternalPrintgNonLine(char *message)
 			}
 			else	
 			{
-				DrawLetter(column,line, '\a', (*text_attr >> 4) & 0x07);
-				DrawLetter(column,line, message[letter], *text_attr % 0x10);
+				DrawLetter(column,line, '\a', InternalTextModeToVga(*text_attr >> 4) & 0x07);
+				DrawLetter(column,line, message[letter], InternalTextModeToVga(*text_attr % 0x10));
 				column++;
 			}
 
