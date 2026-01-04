@@ -1396,6 +1396,7 @@ void InitializeKernel(KernelServices* Services)
 	Dsp->DrawLetter 	   = &DrawLetterOffset;
 	Dsp->GetPixel		   = &InternalPixelGetColorOf;
 	Dsp->Blt			   = &InternalBlitingRectangle;
+	Dsp->LrgbToVga		   = &InternalLrgbToVga;
 
     Dsp->CurrentLine      = 0;
     Dsp->CurrentCharacter = 0;
