@@ -89,6 +89,23 @@ char* AllocateStringArray(char* text)
     return retval;
 }
 
+KernelStatus ExecuteFile(char* path)
+{
+    FatFile Fl = gSys->File->OpenFile(path);
+    ObjectAny FlContent;
+    Entero FlSize;
+    KernelStatus FlOpen = gSys->File->GetFile(Fl, &FlContent, &FlSize);
+
+    if (FlOpen) return FlOpen;
+
+    KernelStatus St = gSys->Misc->RunBinary(FlContent, FlSize, gSys);
+
+    gMS->FreePool(FlContent);
+    gSys->File->CloseFile(Fl);
+
+    return St;
+}
+
 #include "status.h"
 
 #endif

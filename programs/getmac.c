@@ -34,10 +34,10 @@ KernelStatus ErickMain(KernelServices* Services)
     {
         uint8_t AddressPart = MacAddress[i];
         char inttostr[5];
-        IntToString((int)AddressPart, inttostr);
+        IntToHexString((int)AddressPart, inttostr);
 
         Services->Display->printg(inttostr);
-        if (i != 7) Services->Display->printg(".");
+        if (i != 5) Services->Display->printg(".");
     }
     
 

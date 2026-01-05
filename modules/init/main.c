@@ -94,6 +94,7 @@ void InternalExecuteScript(char* buffer)
 
 void DrawImage(int x, int y, int wd, unsigned char* img, int size, uint8_t chroma, int range)
 {
+	if (*(gDS->IsInPixelsMode) != 1) return;
     int xM = x;
     int yM = y;
 
