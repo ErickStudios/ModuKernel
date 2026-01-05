@@ -29,6 +29,15 @@ Este kernel Contiene
 * Archivos de ejemplo
 * Una tabla de servicios del sistema modular y estructurada
 * Una shell basica
+* gdt
+* manejo de excepciones
+* modulos
+* sistema de carpetas virtuales
+* interrupciones
+* contador de tick PIC
+* un script de shell
+* una animacion de logo
+* soporte muy basico para red
 
 ## Compatibilidad con unidades
 
@@ -52,6 +61,7 @@ por ahora estos son los drivers probados y que funcionan a medias
 | VGA (Modo texto) | ![bd](./assets/badgeds/ok.svg) | Soporte primitivo, estable |
 | VGA (Modo grafico) | ![bd](./assets/badgeds/ok.svg) | Soporte como plus |
 | Sonido | ![bd](./assets/badgeds/ok.svg) | Soporte primitivo, usa el buzzer para generar sonidos |
+| Internet | ![bd](./assets/badgeds/bugs.svg) | Soporte plus con un driver, ultra limitado |
 
 ## Compatibilidad con sistemas de archivos
 
