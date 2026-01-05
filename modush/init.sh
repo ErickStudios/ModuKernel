@@ -9,6 +9,10 @@ echo Welcome to ModuKernel!
 # abrir la shell
 kernel/modush
 
+# inicializar Simple Net
+echo Inicializando driver SimpleNET
+dev/snet
+
 # llamar al halt
 call halt
 

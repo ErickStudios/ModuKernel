@@ -17,3 +17,9 @@ compile_raw modules/mouse/ups2.c build/moddrivers/mups2.modubin
 
 # pci
 compile_raw modules/pci/driver.c build/moddrivers/pci.modubin
+
+# red
+compile_raw modules/net/SimpleNetInit.c build/moddrivers/snet.modubin
+compile_raw modules/net/SimpleNetGetMac.c build/moddrivers/snetm.modubin
+compile_raw modules/net/SimpleNetPkgSend.c build/moddrivers/snetps.modubin
+compile_raw modules/net/SimpleNetPkgRecive.c build/moddrivers/snetpr.modubin
