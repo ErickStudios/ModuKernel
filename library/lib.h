@@ -1,7 +1,7 @@
+#ifndef _ModuKernelBaseLibrary_
 #ifdef __cplusplus
 extern "C" {
 #endif
-#ifndef _ModuKernelBaseLibrary_
 #define _ModuKernelBaseLibrary_
 // libreria
 #include <stdint.h>
@@ -32,7 +32,9 @@ IoServices* gIOS;
 // variable independiente de Memoria
 MemoryServices* gMS;
 
+#ifndef __cplusplus
 typedef unsigned long      size_t;
+#endif
 
 typedef signed char        Mini;
 typedef short              Corto;
@@ -110,8 +112,7 @@ KernelStatus ExecuteFile(char* path)
 }
 
 #include "status.h"
-
-#endif
 #ifdef __cplusplus
 }
+#endif
 #endif

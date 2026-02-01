@@ -11,8 +11,11 @@
 /bin/piano;BC10;BIN;
 /bin/snettest;BC11;BIN;
 /bin/svs;BC12;BIN;
-/bin/hello_cpp;BC13;BIN;
-/bin/trivia;BC14;BIN;
+/bin/box;BC13;BIN;
+/bin/hello_cpp;BC14;BIN;
+/bin/persons;BC15;BIN;
+/bin/string_join;BC16;BIN;
+/bin/trivia;BC17;BIN;
 /kernel/denv;AC0;BIN;
 /kernel/init;AC1;BIN;
 /kernel/modush;AC2;BIN;

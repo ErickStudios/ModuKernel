@@ -4,6 +4,7 @@ echo Bienvenido a ModuKernel ahorita mismo se activo el modo sin compilar
 
 # arranca qemu
 qemu-system-i386                                              \
+  -cpu 486,+x87                                               \
   -cdrom build/os.iso                                         \
   -boot d                                                     \
   -fda build/floppy.img                                       \

@@ -235,6 +235,7 @@ sudo cp floppy/* /mnt/qemu_floppy/;sudo umount /mnt/qemu_floppy
 
 # arranca qemu
 qemu-system-i386                                              \
+  -cpu 486,+x87                                               \
   -cdrom build/os.iso                                         \
   -boot d                                                     \
   -fda build/floppy.img                                       \
