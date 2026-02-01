@@ -14,8 +14,10 @@ SECTIONS
     /* actual */
 	. = 0x100000;
     .multiboot : { KEEP(*(.multiboot)) }
+    KernelStart = .;   /* inicio del código */
     /* codigo */
 	.text : {*(.text)}
+    KernelEnd = .;     /* fin del código */
     /* datos */
 	.data : {*(.data)}
     /* sin inicializar*/

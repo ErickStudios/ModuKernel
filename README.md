@@ -29,15 +29,17 @@ Este kernel Contiene
 * Archivos de ejemplo
 * Una tabla de servicios del sistema modular y estructurada
 * Una shell basica
-* gdt
+* Un gdt
 * manejo de excepciones
-* modulos
-* sistema de carpetas virtuales
-* interrupciones
-* contador de tick PIC
-* un script de shell
-* una animacion de logo
-* soporte muy basico para red
+* Modulos
+* Sistema de carpetas virtuales
+* Interrupciones
+* Contador de tick PIC
+* Un script de shell
+* Una animacion de logo
+* Soporte muy basico para red
+* su propia paleta de colores
+* Modo texto personalizado
 
 ## Compatibilidad con unidades
 

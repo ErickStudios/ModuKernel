@@ -13,16 +13,17 @@ start:
 	hlt							; por si acaso
 	
 global switch_to_task
+global isr_keyboard_stub
+global isr_idt_stub
+extern keyboard_handler
+extern pic_handler
+; cambiar de tarea
 switch_to_task:
     mov eax, [esp+4]    ; puntero a task_t
     mov esp, [eax]      ; restaurar esp
     mov ebp, [eax+4]    ; restaurar ebp
     jmp [eax+8]         ; saltar a eip
-
-global isr_keyboard_stub
-global isr_idt_stub
-extern keyboard_handler
-extern pic_handler
+; el idt stub del pic
 isr_idt_stub:
 	; guardar
     pusha                           ; guardar todos los generales
@@ -43,6 +44,7 @@ isr_idt_stub:
     popa                            ; recuperar los generales
     iret
 
+; el stub del teclado
 isr_keyboard_stub:
 	; guardar
     pusha                           ; guardar todos los generales

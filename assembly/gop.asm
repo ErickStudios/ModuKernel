@@ -68,19 +68,19 @@ config_mode:
 	; display horizontal
 
 	; retrazo horizontal
-	AjustarCrtc 0x00, 0x9F		; total de horizontal
+	AjustarCrtc 0x00, 0xBF		; total de horizontal
 
-	AjustarCrtc 0x04, 0x52		; inicio del retrazo de horizontal
-	AjustarCrtc 0x05, 0x56		; fin del retrazo de horizontal
-	AjustarCrtc 0x01, 0x9F		; fin del display horizontal
+	AjustarCrtc 0x04, 0x68		; inicio del retrazo de horizontal
+	AjustarCrtc 0x05, 0x6C		; fin del retrazo de horizontal
+	AjustarCrtc 0x01, 0xAF		; fin del display horizontal
 
 	; blanco horizontal
-	AjustarCrtc 0x02, 0x50		; inicio del blanco horizontal
+	AjustarCrtc 0x02, 0x60		; inicio del blanco horizontal
 	AjustarCrtc 0x03, 0x24		; fin del blanco horizontal
 
 	; donde se configura la parte vertical de la pantalla
 
-	AjustarCrtc 0x06, 0xCF		; total del vertical
+	AjustarCrtc 0x06, 0xEF		; total del vertical
 
 	; overflow
 	AjustarCrtc 0x07, 0x1F
@@ -99,7 +99,7 @@ config_mode:
 	AjustarCrtc 0x12, 0xFF		; fin del display vertical
 
 	; offset
-	AjustarCrtc 0x13, 0x50
+	AjustarCrtc 0x13, 0x60
 
 	; ubicacion de underline
 	AjustarCrtc 0x14, 0x80

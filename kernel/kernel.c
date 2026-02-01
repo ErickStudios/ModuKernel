@@ -13,8 +13,14 @@
 // incluir funciones de la libreria c de bajo nivel
 #include "../libc/String.h"
 
+// zonas protegidas
+#include "security.h"
+
 // manejador de excepciones
 ObjectAny ExceptionHandlePtr;
+
+// manejador de violaciones de seguridad
+ObjectAny InCaseOfViolationOfSecurity;
 
 // servicios globales
 KernelServices* GlobalServices;
@@ -71,6 +77,10 @@ extern uint8_t InternalBStg;
 extern uint8_t InternalBStgG;
 extern uint32_t InternalRingLevel;
 
+// variables
+extern uint32_t KernelStart;
+extern uint32_t KernelEnd;
+
 // assembly funciones
 extern function config_mode();
 extern function unconfig_mode();
@@ -86,6 +96,19 @@ extern function isr_idt_stub();
 #define PIT_PORT_COMMAND  0x43
 #define PIT_PORT_CHANNEL0 0x40
 
+// índices en la GDT
+#define GDT_NULL        0
+#define GDT_CODE0       1   // código kernel
+#define GDT_DATA0       2   // datos kernel
+#define GDT_CODE3       3   // código usuario
+#define GDT_DATA3       4   // datos usuario
+
+// selectores (índice << 3)
+#define KERNEL_CS   (GDT_CODE0 << 3)
+#define KERNEL_DS   (GDT_DATA0 << 3)
+#define USER_CS     ((GDT_CODE3 << 3) | 0x3)   // RPL=3
+#define USER_DS     ((GDT_DATA3 << 3) | 0x3)   // RPL=3
+
 // incluir las teclas
 #include "key.h"
 // incluir paquetes
@@ -93,6 +116,46 @@ extern function isr_idt_stub();
 
 uint32_t PitCounter = 0;
 
+uint32_t GetRegValue(regs_t* r, uint8_t index) {
+    switch (index) {
+        case 0: return r->eax;
+        case 1: return r->ecx;
+        case 2: return r->edx;
+        case 3: return r->ebx;
+        case 4: return r->esp;
+        case 5: return r->ebp;
+        case 6: return r->esi;
+        case 7: return r->edi;
+        default: return 0;
+    }
+}
+void AddProtectedZone(ProtectionType Type, uint32_t Start, uint32_t Size) {
+    // reservar espacio para una zona más
+    ProtectedZone* newZones = AllocatePool((ProtectedZonesCount + 1) * sizeof(ProtectedZone));
+    if (!newZones) return; // error de memoria
+
+    // copiar las zonas anteriores
+    if (ProtectedZonesCount > 0 && ProtectedZones != NULL) {
+        InternalMemoryCopy(newZones, ProtectedZones, ProtectedZonesCount * sizeof(ProtectedZone));
+        FreePool(ProtectedZones);
+    }
+
+    // añadir la nueva zona al final
+    newZones[ProtectedZonesCount].TypeOfProtection = Type;
+    newZones[ProtectedZonesCount].StartOfProtectedZone = Start;
+    newZones[ProtectedZonesCount].SizeOfProtectedZone = Size;
+
+    // actualizar puntero y contador
+    ProtectedZones = newZones;
+    ProtectedZonesCount++;
+}
+void InitializeProtection()
+{
+	// tamaño del Kernel
+	uint32_t kernel_size = (uint32_t)&KernelEnd - (uint32_t)&KernelStart;
+
+	AddProtectedZone(ProtectionTypeOnlyKernel, 0x0010C19A, kernel_size);
+}
 void InternalSendCharToSerialFy(char ch) {
     // esperar transmisor listo
     while ((inb(0x3F8 + 5) & 0x20) == 0);
@@ -100,9 +163,80 @@ void InternalSendCharToSerialFy(char ch) {
     // enviar carácter
     outb(0x3F8, (uint8_t)ch);
 }
+uint32_t DecodeEffectiveAddress(regs_t* r, uint8_t* instr) {
+    uint8_t modrm = instr[0];
+    uint8_t mod = (modrm >> 6) & 0x3;
+    uint8_t rm  = modrm & 0x7;
+
+    uint32_t addr = 0;
+    int offset = 1; // después de ModR/M
+
+    if (mod == 0 && rm == 5) {
+        // disp32 absoluto
+        addr = *(uint32_t*)&instr[offset];
+        offset += 4;
+    } else if (mod == 0) {
+        // dirección en registro base
+        addr = GetRegValue(r, rm); // suponiendo regs[] = EAX, ECX, EDX, EBX, ESP, EBP, ESI, EDI
+    } else if (mod == 1) {
+        int8_t disp8 = *(int8_t*)&instr[offset];
+        offset += 1;
+        addr = GetRegValue(r, rm) + disp8;
+    } else if (mod == 2) {
+        int32_t disp32 = *(int32_t*)&instr[offset];
+        offset += 4;
+        addr = GetRegValue(r, rm) + disp32;
+    }
+
+    // caso especial: rm=4 → SIB
+    if (rm == 4) {
+        uint8_t sib = instr[offset];
+        offset++;
+        uint8_t base = sib & 0x7;
+        uint8_t index = (sib >> 3) & 0x7;
+        uint8_t scale = (sib >> 6) & 0x3;
+
+        addr = GetRegValue(r, base) + (GetRegValue(r, index) << scale);
+
+        if (mod == 1) {
+            int8_t disp8 = *(int8_t*)&instr[offset];
+            offset++;
+            addr += disp8;
+        } else if (mod == 2) {
+            int32_t disp32 = *(int32_t*)&instr[offset];
+            offset += 4;
+            addr += disp32;
+        }
+    }
+
+    return addr;
+}
+void InternalSecurityModifier(regs_t* r)
+{
+	// el kernel puede hacer cualquier cosa
+	if (InternalRingLevel == 0) return;
+
+	// el codigo
+	uint8_t *instr = (uint8_t*)r->eip;
+	uint8_t opcode = instr[0];
+
+    if (opcode == 0x89 || opcode == 0xC7) {
+        uint8_t modrm = instr[1];
+        uint8_t mod = (modrm >> 6) & 0x3;
+        uint8_t rm  = modrm & 0x7;
+
+        if (mod != 3) {
+            uint32_t addr = DecodeEffectiveAddress(r, instr+1);
+
+			if (IsAddressProtected(addr)) r->eip = (uint32_t)InCaseOfViolationOfSecurity;
+        }
+    }
+}
 void pic_handler(regs_t* r) {
 	// contador mas
 	PitCounter++;
+	// hacer seguridad
+	InternalSecurityModifier(r);
 	// interrupcion terminada
     outb(0x20, 0x20); 
 }
@@ -257,6 +391,16 @@ void init_gdt() {
     gdt[2].access       = 0x92;   // data, ring 0
     gdt[2].granularity  = 0xCF;
     gdt[2].base_high    = 0x00;
+
+    // código kernel (base=0, limit=4GB, acceso=0x9A, gran=0xCF)
+    set_gdt_entry(GDT_CODE0, 0, 0xFFFFFFFF, 0x9A, 0xCF);
+    // datos kernel (acceso=0x92)
+    set_gdt_entry(GDT_DATA0, 0, 0xFFFFFFFF, 0x92, 0xCF);
+
+    // código usuario (acceso=0xFA → ejecutable, readable, DPL=3)
+    set_gdt_entry(GDT_CODE3, 0, 0xFFFFFFFF, 0xFA, 0xCF);
+    // datos usuario (acceso=0xF2 → writable, DPL=3)
+    set_gdt_entry(GDT_DATA3, 0, 0xFFFFFFFF, 0xF2, 0xCF);
 }
 void pit_init(uint32_t freq) {
     uint16_t divisor = (uint16_t)(PIT_FREQUENCY / freq);
@@ -277,7 +421,7 @@ uint16_t pit_read_counter() {
 void InternalDrawPixel(uint8_t color, int x, int y) 
 {
     uint8_t* vram = (uint8_t*)0xA0000;
-    vram[y*160 + x] = color;
+    vram[y*(96 * 2) + x] = color;
 }
 void InternalBlitingRectangle(uint8_t color, int x, int y, int SizeX, int SizeY)
 {
@@ -393,8 +537,8 @@ void DrawLetterOffset(int x, int y, char letter, uint8_t color, int ofX, int OfY
 	else if (letter == ',') DrawBitmap(comma_bitmap, realx, realy, color);
 	else if (letter == '-') DrawBitmap(minussim_bitmap, realx, realy, color);
 	else if (letter == '\a') {
-		DrawBitmap(lleno_bitmap, realx, realy - 1, color);
-		DrawBitmap(lleno_bitmap, realx + 1, realy - 1, color);
+		DrawBitmap(lleno_bitmap, realx, realy - 2, color);
+		DrawBitmap(lleno_bitmap, realx + 1, realy - 2, color);
 		DrawBitmap(lleno_bitmap, realx, realy, color);
 		DrawBitmap(lleno_bitmap, realx + 1, realy, color);
 	}
@@ -2181,6 +2325,13 @@ void InternalSysCommandExecute(KernelServices* Services, char* command, int lena
 	}
 	else if (StrCmp(command, "modupanic") == 0) InternalModuPanic(KernelStatusSuccess);
 	else if (StrCmp(command, "") == 0);
+	else if (StrCmp(command, "xd") == 0)
+	{
+		char xd[20];
+
+		IntToHexString((uint32_t)InCaseOfViolationOfSecurity, xd);
+		Services->Display->printg(xd);
+	}
 	else if (StrCmp(command, "memmap") == 0)
 	{
 		KernelPool* Index = heap_start;
@@ -2587,6 +2738,8 @@ ChoseDiskToBoot:
 	// inicializar idt
 	idt_init();
 
+	InitializeProtection();
+
 	// debuggear
 	SystemInternalMessage("Inicializando Servicios...");
 
@@ -2640,6 +2793,15 @@ ChoseDiskToBoot:
 	// esto no es otra etapa de arranque, sigue siendo la etapa de arranque normal
 	// aunque aqui se hace una animacion para que no se vea muy cutre, recuerden, pueden
 	// personalizarla si se basan en el kernel
+
+	InCaseOfViolationOfSecurity = &&EnCasoDePageFaultMuyGrave;
+
+EnCasoDePageFaultMuyGrave:
+	// esto se puede llamar o si el kernel esta iniciando o si por seguridad alguien
+	// violo las leyes del kernel, a diferencia de las excepciones en vez de terminar el programa
+	// esto hace que el kernel 'vuelva a nacer' osea que reinicia el init y esto hace por que
+	// en algunos casos las excepciones y el Control+C no funcionan y en vez de retornar al proceso
+	// anterior reinicia el init
 
 	InternalRingLevel -= 2;
 
@@ -2795,10 +2957,19 @@ void InternalPrintgNonLine(char *message)
 
 		while (message[letter])
 		{
-			if (line >= 28) {
+			int max_lines = 28;
+			if (line >= max_lines) {
 				char* vidmem = (char *)0xA0000;
-				InternalMemMove(vidmem, vidmem + ((320 * 4) + 160), 320*200);
-				line = 27;
+				int pos1 = vidmem + (((96 * 2) * (max_lines-20)) + (96 * 2));
+				int size = (192*2)*400;
+
+				for (size_t i = 0; i < 35; i++) DrawLetter(i,max_lines, '\a', InternalTextModeToVga(*text_attr >> 4) & 0x07);
+				for (size_t i = 0; i < 35; i++) DrawLetter(i,max_lines + 1, '\a', InternalTextModeToVga(*text_attr >> 4) & 0x07);
+
+				InternalMemorySet(vidmem + size, 0, size);
+				InternalMemMove(vidmem, pos1, size);
+
+				line = max_lines-1;
 			}
 			if (message[letter] == '\n')
 			{
@@ -2812,7 +2983,7 @@ void InternalPrintgNonLine(char *message)
 				column++;
 			}
 
-			if (column >= 32)
+			if (column >= 35)
 			{
 				line++;
 				column = 0;
