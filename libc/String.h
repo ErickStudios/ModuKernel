@@ -1,7 +1,7 @@
 #ifndef LibcStringDotH
 #define LibcStringDotH
 // obtiene la longitud de s
-int StrLen(char* s)
+int StrLen(const char* s)
 {
     // variables
     int ch, len; ch = 0; len = 0;

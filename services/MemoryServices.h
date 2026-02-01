@@ -17,27 +17,6 @@ typedef unsigned int (*KernelMemoryGetFreeHeapSize)();
 typedef void (*KernelMemoryRepairMemoryByDream)(struct _KernelServices* Services);
 /* el tipo para setear memoria */
 typedef void* (*KernelMemorySet)(void* dest, int value, unsigned int count);
-/* enum para los tipos de memoria dinamica del Kernel */
-typedef enum _ModuAllocType
-{
-    /* para el tipo de memoria para los servicios
-    del kernel por ejemplo el display, io, memoria */
-    MemAllocTypeKernelServices,
-    /* tipo de rastreo de programas, que hacen los programas
-    al crear memoria */
-    MemAllocTypePrograms,
-    /* el tipo de memoria del sistema, que se puede hacer para
-    el tipo de memoria del sistema en la shell */
-    MemAllocTypeSystem,
-    /* el tipo de memoria liberada o desconozida */
-    MemAllocTypeFreeOrNotExist,
-    /* el tipo de memoria de pila de programas, esta memoria se
-    reserva para apilar los programas uno por uno para poder hacer
-    un stack de programas y no sobreescribir ninguno de los datos*/
-    MemAllocTypeProgramsStackMemory,
-    /* el tipo de memoria ultimo */
-    MemAllocTypeMaxMemoryType
-} ModuAllocType;
 /* la estructura */
 typedef struct _MemoryServices {
     /* funcion para asignar memoria dinamica usa un unico parametro

@@ -1,4 +1,3 @@
-
 # compilar un c
 function compile_raw() {
     # el archivo
@@ -11,6 +10,21 @@ function compile_raw() {
     # linkear
     ld -m elf_i386 -T ABI/user_link.ld --oformat binary temp.o -o "$out"
     # eliminar el temporal
+    rm -f temp.o
+}
+# compilar un cpp
+function compile_cpp() {
+    local src="$1"
+    local out="$2"
+
+    # compilar con g++
+    g++ -m32 -ffreestanding -fno-pic -fno-stack-protector -nostdlib \
+        -fno-exceptions -fno-rtti -c "$src" -o temp.o
+
+    # linkear igual que en C
+    ld -m elf_i386 -T ABI/user_link.ld --oformat binary temp.o -o "$out"
+
+    # limpiar temporal
     rm -f temp.o
 }
 # compilar assembly

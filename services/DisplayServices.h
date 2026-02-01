@@ -14,7 +14,7 @@ typedef void (*KernelSimpleDisplayClearScreen)();
 /* el tipo de atributos */
 typedef void (*KernelSimpleDisplaySetAttrs)(char bg, char fg);
 /* el tipo de setteo */
-typedef void (*KernelSimpleDisplaySetAsDefault)(struct _DisplayServices* this);
+typedef void (*KernelSimpleDisplaySetAsDefault)(struct _DisplayServices* self);
 /* el tipo de pantalla iniciando */
 typedef void (*KernelSimpleDisplayInitGopScreen)();
 /* el tipo para imprimir pixeles */

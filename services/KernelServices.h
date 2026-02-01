@@ -1,3 +1,6 @@
+#ifdef __cplusplus
+extern "C" {
+#endif
 #ifndef KernelServicesDotH
 #define KernelServicesDotH
 // incluir los servicios
@@ -10,28 +13,7 @@
 #include "MusicServices.h"
 #include "PackageServices.h"
 /* codigos de error entre otros */
-typedef enum _KernelStatus {
-    /* se puede */
-    KernelStatusSuccess,
-    /* no se encontro */
-    KernelStatusNotFound,
-    /* que fue tan desastrozo que nisiquiera se ModuKernel molesto en decir que diablos paso */
-    KernelStatusDisaster,
-    /* que se quedo congelado y lo unico que te salvo fue un timeout */
-    KernelStatusInfiniteLoopTimeouted,
-    /* que no hay presupuesto para mas memoria */
-    KernelStatusNoBudget,
-    /* error de memoria que no se puede leer o escribir */
-    KernelStatusMemoryRot,
-    /* error del disco que no se puede leer o escribir */
-    KernelStatusDiskServicesDiskErr,
-    /* el parametro que se mando fue uno que no es valido */
-    KernelStatusInvalidParam,
-    /* si algo es muy pequeño para ser usado o cargado */
-    KernelStatusThingVerySmall,
-    /* si el dispositivo esta opcupado */
-    KernelStatusDeviceBusy
-} KernelStatus;
+#include "Status.h"
 /* el tipo de hora y fecha que es una estructura para hacerlo mas limpio */
 typedef struct _KernelDateTime {
     /* contiene el año actual */
@@ -136,4 +118,7 @@ typedef struct _KernelServices {
     /* paquetes */
     PackageServices* Packages;
 } KernelServices;
+#ifdef __cplusplus
+}
+#endif
 #endif

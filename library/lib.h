@@ -1,3 +1,6 @@
+#ifdef __cplusplus
+extern "C" {
+#endif
 #ifndef _ModuKernelBaseLibrary_
 #define _ModuKernelBaseLibrary_
 // libreria
@@ -77,9 +80,9 @@ void InitializeLibrary(Sys* System)
 
 char* AllocateStringArray(char* text)
 {
-    size_t len = StrLen(text) + 1; // incluye el '\0'
+    unsigned int len = (unsigned int)StrLen(text) + 1; // incluye el '\0'
 
-    char* retval = gMS->AllocatePool(len);
+    char* retval = (char*)gMS->AllocatePool(len);
     if (!retval) {
         return 0; // manejo de error si no hay memoria
     }
@@ -94,7 +97,7 @@ KernelStatus ExecuteFile(char* path)
     FatFile Fl = gSys->File->OpenFile(path);
     ObjectAny FlContent;
     Entero FlSize;
-    KernelStatus FlOpen = gSys->File->GetFile(Fl, &FlContent, &FlSize);
+    KernelStatus FlOpen = (KernelStatus)gSys->File->GetFile(Fl, &FlContent, &FlSize);
 
     if (FlOpen) return FlOpen;
 
@@ -108,4 +111,7 @@ KernelStatus ExecuteFile(char* path)
 
 #include "status.h"
 
+#endif
+#ifdef __cplusplus
+}
 #endif

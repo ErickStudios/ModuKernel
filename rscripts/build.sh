@@ -72,6 +72,17 @@ if [ "$UnableExamplesPrograms" = false ]; then
         let afaf=afaf+1
     done
     # bucle
+    for file in programs/*.cpp; do
+        # nombre
+        nameq=$(basename "$file"); name="${nameq%.*}"
+        # compilar
+        compile_cpp "$file" "disk/BC$afaf.BIN"
+        # agregar al fsmap
+        echo "/bin/$name;BC$afaf;BIN;" >> disk/FSLST.IFS
+        # siguiente archivo
+        let afaf=afaf+1
+    done
+    # bucle
     for file in programs/*.asm; do
         # nombre
         nameq=$(basename "$file"); name="${nameq%.*}"

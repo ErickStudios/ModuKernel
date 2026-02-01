@@ -11,11 +11,11 @@ struct _FatFile;
 /* servicio de buscar archivos archivos */
 typedef struct _FatFile (*KernelSimpleDiskFindFile)(char* name, char* ext);
 /* cargar archivo */
-typedef enum _KernelStatus (*KernelSimpleDiskGetFile)(struct _FatFile file, void** content, int* size);
+typedef KernelStatus (*KernelSimpleDiskGetFile)(struct _FatFile file, void** content, int* size);
 /* servicio de ejecutar archivos */
-typedef enum _KernelStatus (*KernelSimpleDiskExecuteFile)(char* name, char* ext, struct _KernelServices* Services);
+typedef KernelStatus (*KernelSimpleDiskExecuteFile)(char* name, char* ext, struct _KernelServices* Services);
 /* para leer un sector */
-typedef enum _KernelStatus (*KernelSimpleDiskReadSector)(unsigned int lba, unsigned char* buffer);
+typedef KernelStatus (*KernelSimpleDiskReadSector)(unsigned int lba, unsigned char* buffer);
 /* para usar el tipo de directorios extendidos */
 typedef struct _FatFile (*KernelSimpleDiskOpen)(char* path);
 /* para cerrar un archivo */
