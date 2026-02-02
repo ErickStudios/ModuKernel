@@ -17,7 +17,14 @@ elif [ "$1" = "--run" ]; then
 # si no
 else
     echo "comando no conocido"
+    echo " "
+    echo "comandos conocidos"
     echo "--build    construye el proyecto"
     echo "--run      ejecuta el kernel directamente"
+    echo " "
+    echo "ejemplos de distribuciones"
+    echo "*simple    bash ModuKernel.sh --build --udrvex --uprgex --uufs"
+    echo "*metal     bash ModuKernel.sh --build --udrvex --uprgex --uufs --usysrt"
+    echo "*full      bash ModuKernel.sh --build"
     cd ..
 fi

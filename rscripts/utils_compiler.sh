@@ -4,9 +4,19 @@ function compile_raw() {
     local src="$1"
     # el outer
     local out="$2"
+    # la descripción opcional
+    local desc="$3"
+
+    if [ -n "$desc" ]; then
+        # Si hay descripción, imprime tres columnas
+        printf "%-40s:%-40s:%-7s\n" "$src" "$out" "$desc"
+    else
+        # Si no hay descripción, imprime solo dos columnas
+        printf "%-40s:%-40s\n" "$src" "$out"
+    fi
 
     # el gcc
-    gcc -m32 -ffreestanding -fno-pic -fno-stack-protector -nostdlib -c "$src" -o temp.o
+    gcc -m32 -ffreestanding -fno-pic -fno-stack-protector -nostdlib -c "$src" -o temp.o -w 1>/dev/null
     # linkear
     ld -m elf_i386 -T ABI/user_link.ld --oformat binary temp.o -o "$out"
     # eliminar el temporal
@@ -16,10 +26,20 @@ function compile_raw() {
 function compile_cpp() {
     local src="$1"
     local out="$2"
+    # la descripción opcional
+    local desc="$3"
+
+    if [ -n "$desc" ]; then
+        # Si hay descripción, imprime tres columnas
+        printf "%-40s:%-40s:%-7s\n" "$src" "$out" "$desc"
+    else
+        # Si no hay descripción, imprime solo dos columnas
+        printf "%-40s:%-40s\n" "$src" "$out"
+    fi
 
     # compilar con g++
     g++ -m32 -ffreestanding -fno-pic -fno-stack-protector -nostdlib \
-        -fno-exceptions -fno-rtti -c "$src" -o temp.o
+        -fno-exceptions -fno-rtti -c "$src" -o temp.o -w 1>/dev/null
 
     # linkear igual que en C
     ld -m elf_i386 -T ABI/user_link.ld --oformat binary temp.o -o "$out"

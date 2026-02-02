@@ -15,6 +15,10 @@ source rscripts/utils_compiler.sh
 # crear el build
 mkdir -p build;rm -rf disk/*;: > disk/FSLST.IFS
 
+echo "------------------------------------------------------------------------------------------------------------------------"
+printf "| %-37s | %-38s | %-35s |\n" "Program/Driver/Module" "Target File" "Description"
+echo "------------------------------------------------------------------------------------------------------------------------"
+
 # parametros del script
 for arg in "$@"; do
     # desactivar drivers de ejemplos
@@ -41,12 +45,16 @@ done
 # si compilara el kernel
 if [ "$UnableKernelCompilation" = false ]; then
 
+    printf "%-40s:%-40s\n" "assembly/kernel.asm" "build/kasm.o"
+
     # compilar el kernel.asm
-    nasm -f elf32 assembly/kernel.asm -o build/kasm.o
+    nasm -f elf32 assembly/kernel.asm -o build/kasm.o -w-number-overflow 1>/dev/null
+    
+    printf "%-40s:%-40s\n" "kernel/kernel.c" "build/kc.o"
     # compilar el kernel.c
-    gcc -m32 -ffreestanding -fno-stack-protector -nostdlib -c kernel/kernel.c -o build/kc.o
+    gcc -m32 -ffreestanding -fno-stack-protector -nostdlib -c kernel/kernel.c -o build/kc.o -w 1>/dev/null
     # linkear el kernel
-    ld -m elf_i386 -T ABI/kernel_link.ld -o build/kernel build/kasm.o build/kc.o
+    ld -m elf_i386 -T ABI/kernel_link.ld -o build/kernel build/kasm.o build/kc.o --no-warn-rwx-segments 1>/dev/null
 
 fi
 # compilar los programas
@@ -235,7 +243,7 @@ sudo cp floppy/* /mnt/qemu_floppy/;sudo umount /mnt/qemu_floppy
 
 # arranca qemu
 qemu-system-i386                                              \
-  -cpu 486,+x87                                               \
+  -cpu pentium3                                               \
   -cdrom build/os.iso                                         \
   -boot d                                                     \
   -fda build/floppy.img                                       \

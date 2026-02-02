@@ -1,4 +1,4 @@
-/// libreria de C++ para ModuKernel v0.1
+/// libreria de C++ v0.1 para ModuKernel (library/lib.hpp)
 
 /// pragma once
 #pragma once
@@ -171,6 +171,9 @@ namespace ModuLibCpp
         /// @brief por favor cuide la caja manualmente verificando si su contenido esta presente
         /// @return el contenido
         T Open() const { return *Content;}
+        /// @brief funcion que ayuda a que Open no haga un desastre
+        /// @return si no es nullptr
+        bool HasValue() const { return Content != nullptr; }
         /// @brief abre la caja como un array
         /// @return el contenido
         T* OpenArray() const { return Content;}
@@ -179,9 +182,31 @@ namespace ModuLibCpp
         /// @return la caja
         Box& operator=(Box&& other) noexcept { if (this != &other) { delete Content; Content = other.Content; other.Content = nullptr;} return *this; }
     };
-    // alias para los de pythn
+    /// @brief un par
+    /// @tparam A el tipo del a
+    /// @tparam B el tipo del b
+    template <typename A, typename B>
+    struct Pair {
+        /// @brief el primero
+        A first;
+        /// @brief el segundo
+        B second;
+    };
+    /// @brief el tipo de tercero
+    /// @tparam A el tipo del a
+    /// @tparam B el tipo del b
+    /// @tparam C el tipo del c
+    template <typename A, typename B, typename C>
+    struct ThridyPair {
+        /// @brief el primero
+        A first;
+        /// @brief el segundo
+        B second;
+        /// @brief el tercero
+        C third;
+    };
+    /// @brief alias para los de pythn
     using str = String;
     /// @brief alias para el string
     using string = str;
-
 }

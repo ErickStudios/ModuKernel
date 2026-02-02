@@ -72,10 +72,10 @@ public:
 extern "C" KernelStatus ErickMain(KernelServices* Services) {
     // inicializar libreria
     InitializeLibrary(Services);
-
+    
     // la persona
     Persona* p = new Persona("Erick", 25, Genero::Masculino);
-    
+
     // presentarla
     p->presentar();
 

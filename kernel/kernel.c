@@ -2185,6 +2185,13 @@ void InternalSysCommandExecute(KernelServices* Services, char* command, int lena
 	}
 	else if (StrCmp(command, "reset") == 0) Services->Misc->Reset(0);
 	else if (StrCmp(command, "shutdown") == 0) Services->Misc->Reset(1);
+	else if (StrCmp(command, "mwheap") == 0) {
+		uint32_t Rest = (uint32_t)(Services->Info->ModuWorldPtr) - (uint32_t)(&_heap_end);
+		char buffer[16];
+		IntToHexString(Rest, buffer);
+		Services->Display->printg(buffer);
+		Services->Display->printg("\n");
+	}
 	else if (StrCmp(command, "heap") == 0)
 	{
 		unsigned int HeapRest = Services->Memory->GetFreeHeap();

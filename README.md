@@ -32,6 +32,7 @@ Este kernel Contiene
 * Un gdt
 * manejo de excepciones
 * Modulos
+* Sistema de archivos FAT12
 * Sistema de carpetas virtuales
 * Interrupciones
 * Contador de tick PIC
@@ -40,6 +41,9 @@ Este kernel Contiene
 * Soporte muy basico para red
 * su propia paleta de colores
 * Modo texto personalizado
+* Soporte para C++
+* Libreria avanzada C++
+* Drivers
 
 ## Compatibilidad con unidades
 

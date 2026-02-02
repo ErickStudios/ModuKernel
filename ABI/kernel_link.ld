@@ -37,7 +37,7 @@ SECTIONS
     /* para AllocatePool y Servicios.Memory->AllocatePool*/
     _heap_start = .;
     /* fin del heap */
-    . += 0xF00000;
+    . += 0x8000000;
     /* fin */
     _heap_end = .;
 }
