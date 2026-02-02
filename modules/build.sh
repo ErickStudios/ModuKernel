@@ -31,5 +31,6 @@ compile_raw modules/net/SimpleNetPkgSet.c build/moddrivers/snetpst.modubin "Simp
 compile_raw modules/net/SimpleNetPkgUnset.c build/moddrivers/snetus.modubin "Simple NET Package Unset Buffer"   # Simple NET Package Unset Buffer
 compile_raw modules/teleq/driver.c build/moddrivers/stlq.modubin "Simple NET simple telecomunication"           # Simple NET simple telecomunication
 
-# Simple Regex                                                                                      ( in /dev )
-compile_cpp modules/regex/regex.cpp build/moddrivers/srex.modubin "Simple Regex Match True/False"   # Simple Regex Match True/False
+# Simple Regex                                                                                                  ( in /dev )
+compile_cpp modules/regex/regex.cpp build/moddrivers/srex.modubin "Simple Regex Match True/False"               # Simple Regex Match True/False
+compile_cpp modules/regex/tregex.cpp build/moddrivers/trex.modubin "Simple Regex Match Typed"                   # Simple Regex Match Typed

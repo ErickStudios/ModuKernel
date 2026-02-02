@@ -112,6 +112,13 @@ namespace ModuLibCpp
             // comparar strings
             return StrCmp(InternalString, other.InternalString) == 0;
         }
+        /// @brief compara dos strings
+        /// @param other el otro string
+        /// @return true si es verdadero y false si no coinciden
+        bool operator==(char* other) const {
+            // comparar strings
+            return StrCmp(InternalString, other) == 0;
+        }
         /// @brief añade el string con otro
         /// @param other el otro
         /// @return un string
@@ -130,6 +137,120 @@ namespace ModuLibCpp
             }
             // el string
             return String(newStr);
+        }
+        /// @brief operador << como alias de AddChar
+        /// @param c el carácter a añadir
+        /// @return referencia al propio String
+        String& operator<<(char c) {
+            AddChar(c);
+            return *this;
+        }
+        /// @brief devuelve puntero al inicio
+        char* begin() { return InternalString; }
+        /// @brief devuelve puntero al final (justo antes del nullchar)
+        char* end() { return InternalString + StrLen(InternalString); }
+        /// @brief versión const para foreach en const String
+        const char* begin() const { return InternalString; }
+        const char* end() const { return InternalString + StrLen(InternalString); }
+        /// @brief añade un carácter al final del string
+        /// @param c el carácter a añadir
+        void AddChar(char c) {
+            // longitud actual
+            size_t oldLen = StrLen(InternalString);
+
+            // nuevo tamaño (+1 para el nuevo char, +1 para el terminador)
+            size_t newLen = oldLen + 2;
+
+            // reservar nuevo pool
+            char* newStr = (char*) gMS->AllocatePool(newLen);
+
+            if (newStr) {
+                // copiar el contenido anterior
+                gMS->CoppyMemory(newStr, InternalString, oldLen);
+
+                // añadir el nuevo carácter
+                newStr[oldLen] = c;
+
+                // añadir el terminador
+                newStr[oldLen + 1] = '\0';
+
+                // liberar el viejo string
+                if (InternalString) gMS->FreePool(InternalString);
+
+                // asignar el nuevo
+                InternalString = newStr;
+            }
+        }
+        /// @brief limpia el string
+        void ClearString()
+        {
+            gMS->FreePool((void*)InternalString);
+            InternalString = (char*)gMS->AllocatePool(1);
+            InternalString[0] = '\0';
+        }
+        /// @brief asigna un nuevo contenido al string
+        /// @param str el nuevo contenido (char*)
+        void SetString(const char* str) {
+            // liberar el contenido actual
+            if (InternalString) {
+                gMS->FreePool(InternalString);
+            }
+
+            // calcular longitud del nuevo string (+1 para '\0')
+            size_t len = StrLen(str) + 1;
+
+            // reservar nuevo pool
+            InternalString = (char*) gMS->AllocatePool(len);
+
+            // copiar memoria
+            if (InternalString) {
+                gMS->CoppyMemory(InternalString, str, len);
+            }
+        }
+        /// @brief devuelve true si empieza con un carácter
+        bool StartsWith(char c) const {
+            return InternalString[0] == c;
+        }
+        /// @brief devuelve true si termina con un carácter
+        bool EndsWith(char c) const {
+            size_t len = StrLen(InternalString);
+            if (len == 0) return false;
+            return InternalString[len - 1] == c;
+        }
+        /// @brief elimina el primer carácter
+        void RemoveFirstChar() {
+            size_t len = StrLen(InternalString);
+            if (len == 0) return;
+            // mover todo una posición hacia atrás
+            for (size_t i = 1; i <= len; i++) {
+                InternalString[i - 1] = InternalString[i];
+            }
+        }
+        /// @brief elimina el último carácter
+        void RemoveLastChar() {
+            size_t len = StrLen(InternalString);
+            if (len == 0) return;
+            InternalString[len - 1] = '\0';
+        }
+        /// @brief elimina espacios al inicio y al final
+        void Trim() {
+            // quitar espacios al inicio
+            while (InternalString[0] == ' ' || InternalString[0] == '\n' || InternalString[0] == '\t') {
+                RemoveFirstChar();
+            }
+            // quitar espacios al final
+            while (EndsWith(' ') || EndsWith('\n') || EndsWith('\t')) {
+                RemoveLastChar();
+            }
+        }
+        /// @brief verifica si todos los caracteres son dígitos
+        bool IsDigitString() const {
+            size_t len = StrLen(InternalString);
+            if (len == 0) return false;
+            for (size_t i = 0; i < len; i++) {
+                if (InternalString[i] < '0' || InternalString[i] > '9') return false;
+            }
+            return true;
         }
     };
     /// @brief clase del display
