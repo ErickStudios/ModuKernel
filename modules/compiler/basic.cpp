@@ -51,31 +51,63 @@ uint8_t* CodifiqueInstruction(ModuLibCpp::String& instruction, int* len)
                 dst.Trim(); src.Trim();
 
                 Reg32 dstReg = CodifiqueRegister(dst);
-                Reg32 srcReg = CodifiqueRegister(src);
 
-                // caso: reg ← reg
-                if (srcReg != Reg32::EAX || srcReg == Reg32::EAX) // simplificado
-                {
+                if (StrIsNumber(src.InternalString)) {
+                    // caso: reg ← imm32
+                    uint32_t imm = StringToInt(src.InternalString);
+                    uint8_t* code = (uint8_t*)gMS->AllocatePool(5);
+                    code[0] = 0xB8 + (uint8_t)dstReg;   // mov reg, imm32
+                    *(uint32_t*)&code[1] = imm;         // inmediato en little endian
+                    *len = 5;
+                    return code;
+                } else {
+                    // caso: reg ← reg
+                    Reg32 srcReg = CodifiqueRegister(src);
                     uint8_t* code = (uint8_t*)gMS->AllocatePool(2);
-                    code[0] = 0x89;
+                    code[0] = 0x89; // mov r/m32, r32
                     code[1] = (0b11 << 6) | ((uint8_t)srcReg << 3) | (uint8_t)dstReg;
                     *len = 2;
                     return code;
                 }
-
-                /*
-                // caso: reg ← imm32
-                if (StrIsNumber(src.InternalString))
-                {
-                    uint32_t imm = StringToInt(src.InternalString);
-                    uint8_t* code = (uint8_t*)gMS->AllocatePool(5);
-                    code[0] = 0xB8 + (uint8_t)dstReg;
-                    *(uint32_t*)&code[1] = imm;
-                    return code;
-                }*/
             }
 
 
+        }
+        else if (Instr == (char*)"ADD") {
+            char* ops[2];
+            int opCount = StrSplit(dorames[1], ops, ',');
+            if (opCount == 2) {
+                ModuLibCpp::String dst{ops[0]};
+                ModuLibCpp::String src{ops[1]};
+                dst.Trim(); src.Trim();
+
+                Reg32 dstReg = CodifiqueRegister(dst);
+                Reg32 srcReg = CodifiqueRegister(src);
+
+                uint8_t* code = (uint8_t*)gMS->AllocatePool(2);
+                code[0] = 0x01; // ADD r/m32, r32
+                code[1] = (0b11 << 6) | ((uint8_t)srcReg << 3) | (uint8_t)dstReg;
+                *len = 2;
+                return code;
+            }
+        }
+        else if (Instr == (char*)"SUB") {
+            char* ops[2];
+            int opCount = StrSplit(dorames[1], ops, ',');
+            if (opCount == 2) {
+                ModuLibCpp::String dst{ops[0]};
+                ModuLibCpp::String src{ops[1]};
+                dst.Trim(); src.Trim();
+
+                Reg32 dstReg = CodifiqueRegister(dst);
+                Reg32 srcReg = CodifiqueRegister(src);
+
+                uint8_t* code = (uint8_t*)gMS->AllocatePool(2);
+                code[0] = 0x29; // SUB r/m32, r32
+                code[1] = (0b11 << 6) | ((uint8_t)srcReg << 3) | (uint8_t)dstReg;
+                *len = 2;
+                return code;
+            }
         }
     }
 
@@ -100,6 +132,7 @@ uint8_t* CodifiqueProgram(ModuLibCpp::String& ProgramAsm, int* len)
     {
         ModuLibCpp::String line{programLines[i]};
         int len2 = 0;
+
         uint8_t* lineCompiled = CodifiqueInstruction(line, &len2);
 
         compiledLines[i] = lineCompiled;
@@ -148,13 +181,14 @@ extern "C" KernelStatus ErickMain(KernelServices* Services)
 
     // archivo
     FatFile AsmFile = Services->File->OpenFile(file);
-    ObjectAny AsmFileContent;
+    char* AsmFileContent;
     Entero AsmFileSize;
-    KernelStatus AsmOpen = (KernelStatus)gSys->File->GetFile(AsmFile, &AsmFileContent, &AsmFileSize);
+    KernelStatus AsmOpen = (KernelStatus)gSys->File->GetFile(AsmFile, (void**)&AsmFileContent, &AsmFileSize);
 
     // si no se pudo abrir
     if (AsmOpen) return AsmOpen;
 
+    AsmFileContent[AsmFileSize] = 0;
     int len = 0;
 
     // el archivo

@@ -201,7 +201,14 @@ char* StrUpr(char* str)
     }
     return str;
 }
-
+char StrIsNumber(const char* str) {
+    if (!str || *str == '\0') return 0; // vacío no es número
+    while (*str) {
+        if (*str < '0' || *str > '9') return 0;
+        str++;
+    }
+    return 1;
+}
 // devuelve un puntero al primer carácter encontrado, o NULL si no existe
 char* StrChr(const char* str, int ch) {
     while (*str) {
