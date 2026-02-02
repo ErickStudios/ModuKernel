@@ -34,3 +34,6 @@ compile_raw modules/teleq/driver.c build/moddrivers/stlq.modubin "Simple NET sim
 # Simple Regex                                                                                                  ( in /dev )
 compile_cpp modules/regex/regex.cpp build/moddrivers/srex.modubin "Simple Regex Match True/False"               # Simple Regex Match True/False
 compile_cpp modules/regex/tregex.cpp build/moddrivers/trex.modubin "Simple Regex Match Typed"                   # Simple Regex Match Typed
+
+# Assembler                                                                                                     ( in /dev )
+compile_cpp modules/compiler/basic.cpp build/modules/mas.modubin "ModuAssembler assembler"                      # ModuAssembler assembler

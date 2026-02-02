@@ -18,7 +18,8 @@
 /bin/trivia;BC17;BIN;
 /kernel/denv;AC0;BIN;
 /kernel/init;AC1;BIN;
-/kernel/modush;AC2;BIN;
+/kernel/mas;AC2;BIN;
+/kernel/modush;AC3;BIN;
 /dev/mps2;DV0;BIN;
 /dev/mups2;DV1;BIN;
 /dev/pci;DV2;BIN;
@@ -37,10 +38,11 @@
 /sys/init.sh;SH1;NSH;
 /home/myScript.sh;SR0;SRN;
 /home/nota.txt;SR1;SRN;
-/home/test1.txt;SR2;SRN;
-/home/test2.txt;SR3;SRN;
-/home/test3.txt;SR4;SRN;
-/home/test4.txt;SR5;SRN;
-/home/test5.txt;SR6;SRN;
+/home/t.asm;SR2;SRN;
+/home/test1.txt;SR3;SRN;
+/home/test2.txt;SR4;SRN;
+/home/test3.txt;SR5;SRN;
+/home/test4.txt;SR6;SRN;
+/home/test5.txt;SR7;SRN;
 /kernel/logo.bmp;LOGOK;BMP;
 /fs.struct;FSLST;IFS;
