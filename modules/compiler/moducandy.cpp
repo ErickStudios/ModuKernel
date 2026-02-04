@@ -32,6 +32,8 @@ bool IsLetter(char c) {
     if (c >= '0' && c <= '9') return true;
     // Guion bajo
     if (c == '_') return true;
+    // si es
+    if (c == '[' || c == ']') return true;
 
     return false;
 }
@@ -97,6 +99,16 @@ ModuLibCpp::String ParseCode(ModuLibCpp::String& Code)
 
             if (WordSymbol == "return") {
                 CodeRet << ModuLibCpp::String{"ret\n"};
+            }
+            else if (WordSymbol == "unsafe") {
+                it++;
+                if (*it == '"') {
+                    ModuLibCpp::String AssemblyCode{""};
+                    it++;
+                    while ((*it) != '"') {AssemblyCode << *it;++it;}
+
+                    CodeRet << AssemblyCode << ModuLibCpp::String{"\n"};
+                }
             }
             else if (c == '/' && *(it + 1) == '/') {
                 it++;
@@ -269,14 +281,12 @@ extern "C" KernelStatus ErickMain(KernelServices* Services)
     int len = 0;
 
     uint8_t* Buffer = CodifiqueProgram(Code, &len);
-
-    for (size_t i = 0; i < len; i++)
-    {
-        char ll[20];
-        IntToHexString(Buffer[i], ll);
-        ModuLibCpp::Display::Print(ll);
-        ModuLibCpp::Display::Print(" ");
-    }
+    
+    typedef int (*EntryPoint)();
+    EntryPoint fn = (EntryPoint)Buffer;
+    int Retval = fn();
+    ModuLibCpp::Display::Print("\nReturnValue: ");
+    ModuLibCpp::Display::PrintInt(Retval);
     ModuLibCpp::Display::Print("\n");
 
     delete FileContent;

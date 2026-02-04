@@ -1,10 +1,10 @@
 /// si son iguales
 Int32 fn IsEqual() { 
-    return
+    r1=0 return
 }
 /// si no son iguales
 Int32 fn IsNotEqual() {
-    return 
+    r1=1 return 
 }
 /// r1=retval
 KernelStatus fn ErickMain() {

@@ -1,0 +1,27 @@
+/// un programa que programa la memoria de video
+/// unsafe sirve para insertar codigo assembly
+
+Main() return
+
+Int32 fn PutByte() {
+    unsafe "movb [eax],cl"
+    unsafe "inc eax" 
+    unsafe "inc ecx" 
+    return
+}
+
+Int32 fn Main() { 
+    r1=655360 r2=1 
+    PutByte() PutByte() PutByte() PutByte() 
+    PutByte() PutByte() PutByte() PutByte() 
+    PutByte() PutByte() PutByte() PutByte() 
+    PutByte() PutByte() PutByte() PutByte() 
+    PutByte() PutByte() PutByte() PutByte() 
+    PutByte() PutByte() PutByte() PutByte() 
+    PutByte() PutByte() PutByte() PutByte() 
+    PutByte() PutByte() PutByte() PutByte() 
+    PutByte() PutByte() PutByte() PutByte() 
+    PutByte() PutByte() PutByte() PutByte() 
+
+    r1=0 return
+}

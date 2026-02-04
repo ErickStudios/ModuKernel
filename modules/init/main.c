@@ -145,7 +145,7 @@ KernelStatus ErickMain(KernelServices *Services)
 	// longitud
 	int LogoLen = 70;
 
-	//Services->Display->ActivatePixel();
+	Services->Display->ActivatePixel();
 
 	FatFile ImageLogo = Services->File->OpenFile("/kernel/logo.bmp");
 	Entero ImageSize;

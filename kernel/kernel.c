@@ -536,6 +536,10 @@ void DrawLetterOffset(int x, int y, char letter, uint8_t color, int ofX, int OfY
 	else if (letter == '.') DrawBitmap(dot_bitmap, realx, realy, color);
 	else if (letter == ',') DrawBitmap(comma_bitmap, realx, realy, color);
 	else if (letter == '-') DrawBitmap(minussim_bitmap, realx, realy, color);
+	else if (letter == '+') DrawBitmap(plus_bitmap, realx, realy, color);
+	else if (letter == '*') DrawBitmap(astherisc_bitmap, realx, realy, color);
+	else if (letter == '{') DrawBitmap(brace_left, realx, realy, color);
+	else if (letter == '}') DrawBitmap(brace_right, realx, realy, color);
 	else if (letter == '\a') {
 		DrawBitmap(lleno_bitmap, realx, realy - 2, color);
 		DrawBitmap(lleno_bitmap, realx + 1, realy - 2, color);

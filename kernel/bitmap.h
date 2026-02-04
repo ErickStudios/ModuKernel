@@ -859,5 +859,43 @@ unsigned char minussim_bitmap[7] = {
 	0b000000,
 	0b000000,
 };
+unsigned char plus_bitmap[7] = {
+    0b000000, //
+	0b000000,
+	0b001000,
+	0b111110,
+	0b001000,
+	0b000000,
+	0b000000,
+};
+unsigned char astherisc_bitmap[7] = {
+    0b000000, //
+	0b000000,
+	0b001000,
+	0b110110,
+	0b001000,
+	0b000000,
+	0b000000,
+};
+
+unsigned char brace_left[7] = {
+    0b001100,
+    0b001000,
+    0b001000,
+    0b011000,
+    0b001000,
+    0b001000,
+    0b001100,
+};
+
+unsigned char brace_right[7] = {
+    0b011000,
+    0b001000,
+    0b001000,
+    0b001100,
+    0b001000,
+    0b001000,
+    0b011000,
+};
 
 #endif

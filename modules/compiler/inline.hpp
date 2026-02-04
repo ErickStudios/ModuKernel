@@ -34,6 +34,32 @@ struct AssemblyContext {
     {
     }
 };
+enum Reg8 {
+    AL = 0,
+    CL = 1,
+    DL = 2,
+    BL = 3,
+    AH = 4,
+    CH = 5,
+    DH = 6,
+    BH = 7,
+    NONE8 = -1
+};
+
+Reg8 CodifiqueRegister8(ModuLibCpp::String& regStr) {
+    // copiarlo
+    ModuLibCpp::String reg_upr{regStr.InternalString};
+    StrUpr(reg_upr.InternalString);
+    if (reg_upr == "AL") return AL;
+    if (reg_upr == "CL") return CL;
+    if (reg_upr == "DL") return DL;
+    if (reg_upr == "BL") return BL;
+    if (reg_upr == "AH") return AH;
+    if (reg_upr == "CH") return CH;
+    if (reg_upr == "DH") return DH;
+    if (reg_upr == "BH") return BH;
+    return NONE8;
+}
 /// @brief codifica el registro
 /// @param reg el registro
 /// @return el registro
@@ -95,6 +121,19 @@ uint8_t* CodifiqueInstruction(ModuLibCpp::String& instruction, int* len, Assembl
                     *len = 5;
                     return code;
                 } else {
+                    if (dst.StartsWith('[') && dst.EndsWith(']')) {
+                        dst.RemoveFirstChar();
+                        dst.RemoveLastChar();
+                        Reg32 dstMemReg = CodifiqueRegister(dst);
+                        Reg32 srcReg = CodifiqueRegister(src);
+
+                        uint8_t* code = (uint8_t*)gMS->AllocatePool(2);
+                        code[0] = 0x89; // mov r/m32, r32
+                        code[1] = (0b00 << 6) | ((uint8_t)srcReg << 3) | (uint8_t)dstMemReg;
+                        *len = 2;
+                        return code;
+                    }
+
                     // caso: reg ← reg
                     Reg32 srcReg = CodifiqueRegister(src);
                     uint8_t* code = (uint8_t*)gMS->AllocatePool(2);
@@ -106,6 +145,28 @@ uint8_t* CodifiqueInstruction(ModuLibCpp::String& instruction, int* len, Assembl
             }
 
 
+        }
+        else if (Instr == (char*)"MOVB") {
+            char* ops[2];
+            int opCount = StrSplit(dorames[1], ops, ',');
+            if (opCount == 2) {
+                ModuLibCpp::String dst{ops[0]};
+                ModuLibCpp::String src{ops[1]};
+                dst.Trim(); src.Trim();
+
+                if (dst.StartsWith('[') && dst.EndsWith(']')) {
+                    dst.RemoveFirstChar();
+                    dst.RemoveLastChar();
+                    Reg32 dstMemReg = CodifiqueRegister(dst);
+                    Reg8 srcReg = CodifiqueRegister8(src); // AL, BL, CL, DL, etc.
+
+                    uint8_t* code = (uint8_t*)gMS->AllocatePool(2);
+                    code[0] = 0x88; // MOV r/m8, r8
+                    code[1] = (0b00 << 6) | ((uint8_t)srcReg << 3) | (uint8_t)dstMemReg;
+                    *len = 2;
+                    return code;
+                }
+            }
         }
         else if (Instr == (char*)"ADD") {
             char* ops[2];
@@ -170,7 +231,7 @@ uint8_t* CodifiqueInstruction(ModuLibCpp::String& instruction, int* len, Assembl
 
                 if (Label->Name == target) {
                     int instrSize = 5;
-                    int rel = Label->Offset - (*code_len + instrSize);
+                    int32_t rel = Label->Offset - (*code_len + instrSize);
 
                     uint8_t* code = (uint8_t*)gMS->AllocatePool(instrSize);
                     code[0] = 0xE8; // CALL rel32
@@ -186,9 +247,8 @@ uint8_t* CodifiqueInstruction(ModuLibCpp::String& instruction, int* len, Assembl
             Instr.RemoveLastChar();
             AssemblyLabel* label = new AssemblyLabel();
             label->Name.SetString(Instr.InternalString);
-            label->Offset = *len;
+            label->Offset = *code_len;
             context->Labels.push(label);
-
         }
         else if (Instr == (char*)"PUSH") {
             ModuLibCpp::String regStr{dorames[1]};
