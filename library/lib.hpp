@@ -43,7 +43,7 @@ void* operator new[](std::size_t size) {
     // nuevo
     void* p = gMS->AllocatePool(size);
     // retornarlo
-    return p ? p : nullptr;
+    return p;
 }
 
 /// @brief el operator delete[] (para arreglos)
@@ -52,12 +52,57 @@ void operator delete[](void* p) noexcept {
     if (p) gMS->FreePool(p);
 }
 
+/// @brief el operator delete[] con tamaño (C++14+)
+void operator delete[](void* p, std::size_t) noexcept {
+    if (p) gMS->FreePool(p);
+}
 
 /// @brief el namespace de la libreria cpp
 namespace ModuLibCpp
 {
     /// @brief version de la libreria
     const double LibraryVersion = 0.1;
+    /// @brief el array
+    /// @tparam T el tipo
+    template<typename T>
+    class Array {
+        T* data;
+        int capacity;
+        int count;
+
+        void resize(int newCapacity) {
+            T* newData = new T[newCapacity]; // solo copia punteros
+            for (int i = 0; i < count; i++) {
+                newData[i] = data[i];
+            }
+            delete[] data;
+            data = newData;
+            capacity = newCapacity;
+        }
+
+    public:
+        Array(int initialCapacity = 4) {
+            capacity = initialCapacity;
+            count = 0;
+            data = new T[capacity]; // T = AssemblyLabel*
+        }
+
+        ~Array() {
+            delete[] data; // libera solo el arreglo de punteros
+        }
+
+        void push(T value) {
+            if (count >= capacity) resize(capacity * 2);
+            data[count++] = value;
+        }
+
+        int size() const { return count; }
+
+        T& operator[](int index) { return data[index]; }
+
+        T* begin() { return data; }
+        T* end() { return data + count; }
+    };    
     /// @brief clase de i/o avanzado
     class InputOutput {
     public:
@@ -143,6 +188,26 @@ namespace ModuLibCpp
         /// @return referencia al propio String
         String& operator<<(char c) {
             AddChar(c);
+            return *this;
+        }
+        /// @brief operador << como alias de juntar string
+        /// @param c el string a añadir
+        /// @return referencia al propio String
+        String& operator<<(String& other) {
+            int len = StrLen(other.InternalString);
+
+            for (size_t i = 0; i < len; i++) AddChar(other.InternalString[i]);
+            
+            return *this;
+        }
+        /// @brief operador << como alias de juntar string
+        /// @param c el string a añadir
+        /// @return referencia al propio String
+        String& operator<<(const String& other) {
+            int len = StrLen(other.InternalString);
+
+            for (size_t i = 0; i < len; i++) AddChar(other.InternalString[i]);
+            
             return *this;
         }
         /// @brief devuelve puntero al inicio

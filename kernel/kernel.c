@@ -1308,6 +1308,7 @@ unsigned char InternalKeyboardReadChar()
 			else if(scancode == 0x33) character = LowerUpper ? '?' : ',';
 			else if(scancode == 0x34) character = LowerUpper ? '>' : '.';
 			else if(scancode == 0x35) character = LowerUpper ? '<' : '/';
+			else if(scancode == 0x37) character = LowerUpper ? '+' : '*';
 			else if(scancode == 0x3A) LowerUpper = !LowerUpper;
 			else if(scancode == 0x1E) character = 'a';
 			else if(scancode == 0x30) character = 'b';
@@ -1414,6 +1415,7 @@ unsigned char InternalKeyboardReadCharNonBlocking() {
 	else if(scancode == 0x33) character = LowerUpper ? '?' : ',';
 	else if(scancode == 0x34) character = LowerUpper ? '>' : '.';
 	else if(scancode == 0x35) character = LowerUpper ? '<' : '/';
+	else if(scancode == 0x37) character = LowerUpper ? '+' : '*';
 	else if(scancode == 0x3A) LowerUpper = !LowerUpper;
 	else if(scancode == 0x1E) character = 'a';
 	else if(scancode == 0x30) character = 'b';
