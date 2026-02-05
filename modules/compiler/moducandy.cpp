@@ -54,6 +54,7 @@ ModuLibCpp::String ParseCode(ModuLibCpp::String& Code)
 
         if (in_comment)
         {
+            CodeRet << c;
             if (c == '\n') in_comment = false;
             continue;
         }
@@ -113,6 +114,7 @@ ModuLibCpp::String ParseCode(ModuLibCpp::String& Code)
             else if (c == '/' && *(it + 1) == '/') {
                 it++;
                 in_comment = true;
+                CodeRet << ';';
             }
             else if (c == '(' && *(it + 1) == ')')
             {
@@ -221,6 +223,13 @@ void ModuCandyShell()
         {
             Code.ClearString();
         }
+        else if (inlinea == ":asm")
+        {
+            ModuLibCpp::String CodeCompiled = ParseCode(Code);
+            ModuLibCpp::Display::Print("\n");
+            ModuLibCpp::Display::Print(CodeCompiled.InternalString);
+            ModuLibCpp::Display::Print("\n");
+        }
         else if (inlinea == ":q")
         {
             ModuLibCpp::Display::Print("\n");
@@ -281,7 +290,7 @@ extern "C" KernelStatus ErickMain(KernelServices* Services)
     int len = 0;
 
     uint8_t* Buffer = CodifiqueProgram(Code, &len);
-    
+
     typedef int (*EntryPoint)();
     EntryPoint fn = (EntryPoint)Buffer;
     int Retval = fn();

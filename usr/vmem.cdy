@@ -10,9 +10,30 @@ Int32 fn PutByte() {
     return
 }
 
-Int32 fn Main() { 
-    r1=655360 r2=1 
+Int32 fn loopend() {
+    return
+}
+
+Int32 fn loop() {
     PutByte()
+    r1?r3 =loopend unsafe "jmp LOOP"
+}
+
+Int32 fn Set() {
+    r3+r4 r3+r4 r3+r4 r3+r4 r3+r4 r3+r4 r3+r4 r3+r4 r3+r4 r3+r4 r3+r4 r3+r4 return
+}
+
+Int32 fn Main() { 
+    r1=655360 r2=1 r3=r1 r4=160 
+    Set() Set() Set() Set()
+    Set() Set() Set() Set()
+    Set() Set() Set() Set()
+    Set() Set() Set() Set()
+    Set() Set() Set() Set()
+    Set() Set() Set() Set()
+    Set() Set() Set() Set()
+
+    loop()
 
     r1=0 return
 }
