@@ -1,9 +1,14 @@
 extern ColorLoopSystem
+extern UnableGopMode
+
+config_mode_ret:
+	ret
 
 ; configura el modo grafico, esto no funciona por si solo, se necesita
 ; salir entrar salir entrar y mas secuncias raras que parece que todo
 ; se hace para entrar y salir repetidamente
 config_mode:
+
 	; 28MHz habilita RAM, segmento de pantalla A0000
 	mov dx, 0x3C2				; puerto
 	mov al, 0x63				; dato
@@ -70,9 +75,9 @@ config_mode:
 	; retrazo horizontal
 	AjustarCrtc 0x00, 0xBF		; total de horizontal
 
-	AjustarCrtc 0x04, 0x68		; inicio del retrazo de horizontal
-	AjustarCrtc 0x05, 0x6C		; fin del retrazo de horizontal
-	AjustarCrtc 0x01, 0xAF		; fin del display horizontal
+	AjustarCrtc 0x04, 0x48		; inicio del retrazo de horizontal
+	AjustarCrtc 0x05, 0x4C		; fin del retrazo de horizontal
+	AjustarCrtc 0x01, 0xC0		; fin del display horizontal
 
 	; blanco horizontal
 	AjustarCrtc 0x02, 0x60		; inicio del blanco horizontal
@@ -80,12 +85,12 @@ config_mode:
 
 	; donde se configura la parte vertical de la pantalla
 
-	AjustarCrtc 0x06, 0xEF		; total del vertical
+	AjustarCrtc 0x06, 0x2F		; total del vertical
 
 	; overflow
-	AjustarCrtc 0x07, 0x1F
+	AjustarCrtc 0x07, 0x1E
 	AjustarCrtc 0x08, 0x00
-	AjustarCrtc 0x09, 0x41
+	AjustarCrtc 0x09, 0x40
 	AjustarCrtc 0x0A, 0x00
 	AjustarCrtc 0x0B, 0x00
 	AjustarCrtc 0x0C, 0x00
@@ -94,20 +99,20 @@ config_mode:
 	AjustarCrtc 0x0F, 0x00
 
 	; retrazo vertical
-	AjustarCrtc 0x10, 0x12C		; inicio del retrazo vertical
-	AjustarCrtc 0x11, 0xFF		; fin del retrazo vertical
-	AjustarCrtc 0x12, 0xFF		; fin del display vertical
+	AjustarCrtc 0x10, 0x2C		; inicio del retrazo vertical
+	AjustarCrtc 0x11, 0x0F		; fin del retrazo vertical
+	AjustarCrtc 0x12, 0x0F		; fin del display vertical
 
 	; offset
 	AjustarCrtc 0x13, 0x60
 
 	; ubicacion de underline
-	AjustarCrtc 0x14, 0x80
+	AjustarCrtc 0x14, 0xA0
 
 	; blanco vertical
 
-	AjustarCrtc 0x15, 0x96		; inicio del blanco vertical
-	AjustarCrtc 0x16, 0xB9		; fin del blanco vertical
+	AjustarCrtc 0x15, 0x66		; inicio del blanco vertical
+	AjustarCrtc 0x16, 0xC9		; fin del blanco vertical
 
 	; control del modo del CRTC
 	AjustarCrtc 0x17, 0xA3
@@ -255,6 +260,10 @@ unconfig_mode:
 ; esta secuencia se probo primero con comandos y se implemento la secuencia interna
 ; despues
 InternalGopScreenInit:
+	mov al,[UnableGopMode]
+	cmp al,1
+	je config_mode_ret
+
 	; configuracion
 	call config_mode		; modo de configuracion
 	call screen_draw_init	; dibujar negro para inicializar

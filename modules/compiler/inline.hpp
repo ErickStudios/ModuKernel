@@ -28,9 +28,11 @@ struct AssemblyLabel {
 struct AssemblyContext {
     /// @brief labels
     ModuLibCpp::Array<AssemblyLabel*> Labels;
+    /// @brief el offset
+    int offset;
     /// @brief constructor
     AssemblyContext(int initialCapacity = 64)
-        : Labels(initialCapacity)
+        : Labels(initialCapacity), offset(0)
     {
     }
 };
@@ -99,8 +101,7 @@ uint8_t* CodifiqueInstruction(ModuLibCpp::String& instruction, int* len, Assembl
         // volver mayusculas
         StrUpr(Instr.InternalString);
 
-        if (Instr == (char*)"MOV") 
-        {
+        if (Instr == (char*)"MOV" || Instr == (char*)"SETVALUE") {
             char* ops[2];
             int opCount = StrSplit(dorames[1], ops, ',');
 
@@ -133,6 +134,17 @@ uint8_t* CodifiqueInstruction(ModuLibCpp::String& instruction, int* len, Assembl
                         *len = 2;
                         return code;
                     }
+                    if (src.StartsWith('[') && src.EndsWith(']')) {
+                        src.RemoveFirstChar();
+                        src.RemoveLastChar();
+                        Reg32 srcMemReg = CodifiqueRegister(src);
+
+                        uint8_t* code = (uint8_t*)gMS->AllocatePool(2);
+                        code[0] = 0x8B; // mov r32, r/m32
+                        code[1] = (0b00 << 6) | ((uint8_t)dstReg << 3) | (uint8_t)srcMemReg;
+                        *len = 2;
+                        return code;
+                    }
 
                     // caso: reg ← reg
                     Reg32 srcReg = CodifiqueRegister(src);
@@ -146,7 +158,7 @@ uint8_t* CodifiqueInstruction(ModuLibCpp::String& instruction, int* len, Assembl
 
 
         }
-        else if (Instr == (char*)"MOVB") {
+        else if (Instr == (char*)"MOVB" || Instr == (char*)"SETVALUEASBYTE") {
             char* ops[2];
             int opCount = StrSplit(dorames[1], ops, ',');
             if (opCount == 2) {
@@ -166,9 +178,21 @@ uint8_t* CodifiqueInstruction(ModuLibCpp::String& instruction, int* len, Assembl
                     *len = 2;
                     return code;
                 }
+                else if (src.StartsWith('[') && src.EndsWith(']')) {
+                    src.RemoveFirstChar();
+                    src.RemoveLastChar();
+                    Reg32 srcMemReg = CodifiqueRegister(src);
+                    Reg8 dstReg = CodifiqueRegister8(dst); // AL, BL, CL, DL, etc.
+
+                    uint8_t* code = (uint8_t*)gMS->AllocatePool(2);
+                    code[0] = 0x8A; // MOV r8, r/m8
+                    code[1] = (0b00 << 6) | ((uint8_t)dstReg << 3) | (uint8_t)srcMemReg;
+                    *len = 2;
+                    return code;
+                }
             }
         }
-        else if (Instr == (char*)"ADD") {
+        else if (Instr == (char*)"ADD" || Instr == (char*)"ADDNUMBER") {
             char* ops[2];
             int opCount = StrSplit(dorames[1], ops, ',');
             if (opCount == 2) {
@@ -186,7 +210,7 @@ uint8_t* CodifiqueInstruction(ModuLibCpp::String& instruction, int* len, Assembl
                 return code;
             }
         }
-        else if (Instr == (char*)"SUB") {
+        else if (Instr == (char*)"SUB" || Instr == (char*)"SUBNUMBER") {
             char* ops[2];
             int opCount = StrSplit(dorames[1], ops, ',');
             if (opCount == 2) {
@@ -204,7 +228,7 @@ uint8_t* CodifiqueInstruction(ModuLibCpp::String& instruction, int* len, Assembl
                 return code;
             }
         }
-        else if (Instr == (char*)"JMP") {
+        else if (Instr == (char*)"JMP" || Instr == (char*)"CALLWITHOUTSAVE") {
             ModuLibCpp::String target{dorames[1]};
             target.Trim();
 
@@ -223,7 +247,7 @@ uint8_t* CodifiqueInstruction(ModuLibCpp::String& instruction, int* len, Assembl
 
             *len = 5;
         }
-        else if (Instr == (char*)"CALL") {
+        else if (Instr == (char*)"CALL" || Instr == (char*)"CALLPROCEDURE") {
             ModuLibCpp::String target{dorames[1]};
             target.Trim();
 
@@ -250,7 +274,7 @@ uint8_t* CodifiqueInstruction(ModuLibCpp::String& instruction, int* len, Assembl
             label->Offset = *code_len;
             context->Labels.push(label);
         }
-        else if (Instr == (char*)"PUSH") {
+        else if (Instr == (char*)"PUSH" || Instr == (char*)"SAVE") {
             ModuLibCpp::String regStr{dorames[1]};
             regStr.Trim();
             Reg32 reg = CodifiqueRegister(regStr);
@@ -260,7 +284,7 @@ uint8_t* CodifiqueInstruction(ModuLibCpp::String& instruction, int* len, Assembl
             *len = 1;
             return code;
         }
-        else if (Instr == (char*)"POP") {
+        else if (Instr == (char*)"POP" || Instr == (char*)"LOAD") {
             ModuLibCpp::String regStr{dorames[1]};
             regStr.Trim();
             Reg32 reg = CodifiqueRegister(regStr);
@@ -270,7 +294,7 @@ uint8_t* CodifiqueInstruction(ModuLibCpp::String& instruction, int* len, Assembl
             *len = 1;
             return code;
         }
-        else if (Instr == (char*)"INC") {
+        else if (Instr == (char*)"INC" || Instr == (char*)"INCREMENT") {
             ModuLibCpp::String regStr{dorames[1]};
             regStr.Trim();
             Reg32 reg = CodifiqueRegister(regStr);
@@ -280,7 +304,7 @@ uint8_t* CodifiqueInstruction(ModuLibCpp::String& instruction, int* len, Assembl
             *len = 1;
             return code;
         }
-        else if (Instr == (char*)"DEC") {
+        else if (Instr == (char*)"DEC" || Instr == (char*)"DECREMENT") {
             ModuLibCpp::String regStr{dorames[1]};
             regStr.Trim();
             Reg32 reg = CodifiqueRegister(regStr);
@@ -290,13 +314,13 @@ uint8_t* CodifiqueInstruction(ModuLibCpp::String& instruction, int* len, Assembl
             *len = 1;
             return code;
         }
-        else if (Instr == (char*)"RET") {
+        else if (Instr == (char*)"RET" || Instr == (char*)"RETURNTOSOURCE") {
             uint8_t* code = (uint8_t*)gMS->AllocatePool(1);
             code[0] = 0xC3; // RET
             *len = 1;
             return code;
         }
-        else if (Instr == (char*)"CMP") {
+        else if (Instr == (char*)"CMP" || Instr == (char*)"COMPARE") {
             char* ops[2];
             int opCount = StrSplit(dorames[1], ops, ',');
             if (opCount == 2) {
@@ -314,7 +338,7 @@ uint8_t* CodifiqueInstruction(ModuLibCpp::String& instruction, int* len, Assembl
                 return code;
             }
         }
-        else if (Instr == (char*)"JE") {
+        else if (Instr == (char*)"JE" || Instr == (char*)"JUMPIFEQUAL") {
             ModuLibCpp::String target{dorames[1]};
             target.Trim();
 
@@ -336,7 +360,7 @@ uint8_t* CodifiqueInstruction(ModuLibCpp::String& instruction, int* len, Assembl
         
             *len = 6;
         }
-        else if (Instr == (char*)"JG") {
+        else if (Instr == (char*)"JG" || Instr == (char*)"JUMPIFGREATER") {
             ModuLibCpp::String target{dorames[1]};
             target.Trim();
 
@@ -355,6 +379,129 @@ uint8_t* CodifiqueInstruction(ModuLibCpp::String& instruction, int* len, Assembl
             }
 
             *len = 6;
+        }
+        else if (Instr == (char*)"MUL" || Instr == (char*)"MULTIPLIQUE") {
+            ModuLibCpp::String src{dorames[1]};
+            src.Trim();
+            Reg32 srcReg = CodifiqueRegister(src);
+
+            uint8_t* code = (uint8_t*)gMS->AllocatePool(2);
+            code[0] = 0xF7; // grupo de operaciones
+            code[1] = (0b11 << 6) | (4 << 3) | (uint8_t)srcReg; // /4 = MUL
+            *len = 2;
+            return code;
+        }
+        else if (Instr == (char*)"IMUL" || Instr == (char*)"SIGNEDMULTIPLIQUE") {
+            ModuLibCpp::String src{dorames[1]};
+            src.Trim();
+            Reg32 srcReg = CodifiqueRegister(src);
+
+            uint8_t* code = (uint8_t*)gMS->AllocatePool(2);
+            code[0] = 0xF7; // grupo de operaciones
+            code[1] = (0b11 << 6) | (5 << 3) | (uint8_t)srcReg; // /5 = IMUL r/m32
+            *len = 2;
+            return code;
+        }
+        else if (Instr == (char*)"SIMPLEMULTIPLICATION") {
+            char* ops[2];
+            int opCount = StrSplit(dorames[1], ops, ',');
+            if (opCount == 2) {
+                ModuLibCpp::String dst{ops[0]};
+                ModuLibCpp::String src{ops[1]};
+                dst.Trim(); src.Trim();
+
+                Reg32 dstReg = CodifiqueRegister(dst);
+                Reg32 srcReg = CodifiqueRegister(src);
+
+                uint8_t* code = (uint8_t*)gMS->AllocatePool(3);
+                code[0] = 0x0F;
+                code[1] = 0xAF; // IMUL r32, r/m32
+                code[2] = (0b11 << 6) | ((uint8_t)dstReg << 3) | (uint8_t)srcReg;
+                *len = 3;
+                return code;
+            }
+        }
+        else if (Instr == (char*)"DIV" || Instr == (char*)"DIVIDE") {
+            ModuLibCpp::String src{dorames[1]};
+            src.Trim();
+            Reg32 srcReg = CodifiqueRegister(src);
+
+            uint8_t* code = (uint8_t*)gMS->AllocatePool(2);
+            code[0] = 0xF7;
+            code[1] = (0b11 << 6) | (6 << 3) | (uint8_t)srcReg; // /6 = DIV
+            *len = 2;
+            return code;
+        }
+        else if (Instr == (char*)"AND") {
+            char* ops[2];
+            int opCount = StrSplit(dorames[1], ops, ',');
+            if (opCount == 2) {
+                ModuLibCpp::String dst{ops[0]};
+                ModuLibCpp::String src{ops[1]};
+                dst.Trim(); src.Trim();
+
+                Reg32 dstReg = CodifiqueRegister(dst);
+                Reg32 srcReg = CodifiqueRegister(src);
+
+                uint8_t* code = (uint8_t*)gMS->AllocatePool(2);
+                code[0] = 0x21; // AND r/m32, r32
+                code[1] = (0b11 << 6) | ((uint8_t)srcReg << 3) | (uint8_t)dstReg;
+                *len = 2;
+                return code;
+            }
+        }
+        else if (Instr == (char*)"OR") {
+            char* ops[2];
+            int opCount = StrSplit(dorames[1], ops, ',');
+            if (opCount == 2) {
+                ModuLibCpp::String dst{ops[0]};
+                ModuLibCpp::String src{ops[1]};
+                dst.Trim(); src.Trim();
+
+                Reg32 dstReg = CodifiqueRegister(dst);
+                Reg32 srcReg = CodifiqueRegister(src);
+
+                uint8_t* code = (uint8_t*)gMS->AllocatePool(2);
+                code[0] = 0x09; // OR r/m32, r32
+                code[1] = (0b11 << 6) | ((uint8_t)srcReg << 3) | (uint8_t)dstReg;
+                *len = 2;
+                return code;
+            }
+        }
+        else if (Instr == (char*)"XOR" || Instr == (char*)"EXCLUSIVEOR") {
+            char* ops[2];
+            int opCount = StrSplit(dorames[1], ops, ',');
+            if (opCount == 2) {
+                ModuLibCpp::String dst{ops[0]};
+                ModuLibCpp::String src{ops[1]};
+                dst.Trim(); src.Trim();
+
+                Reg32 dstReg = CodifiqueRegister(dst);
+                Reg32 srcReg = CodifiqueRegister(src);
+
+                uint8_t* code = (uint8_t*)gMS->AllocatePool(2);
+                code[0] = 0x31; // XOR r/m32, r32
+                code[1] = (0b11 << 6) | ((uint8_t)srcReg << 3) | (uint8_t)dstReg;
+                *len = 2;
+                return code;
+            }
+        }
+        else if (Instr == (char*)"CDQ") {
+            uint8_t* code = (uint8_t*)gMS->AllocatePool(1);
+            code[0] = 0x99; // CDQ
+            *len = 1;
+            return code;
+        }
+        else if (Instr == (char*)"IDIV") {
+            ModuLibCpp::String src{dorames[1]};
+            src.Trim();
+            Reg32 srcReg = CodifiqueRegister(src);
+
+            uint8_t* code = (uint8_t*)gMS->AllocatePool(2);
+            code[0] = 0xF7;
+            code[1] = (0b11 << 6) | (7 << 3) | (uint8_t)srcReg; // /7 = IDIV
+            *len = 2;
+            return code;
         }
     }
 

@@ -845,9 +845,9 @@ unsigned char comma_bitmap[7] = {
 	0b000000,
 	0b000000,
 	0b000000,
-	0b000000,
-	00011000,
-	0b111000,
+	0b001100,
+	0b110000,
+	0b000000
 };
 
 unsigned char minussim_bitmap[7] = {
@@ -896,6 +896,44 @@ unsigned char brace_right[7] = {
     0b001000,
     0b001000,
     0b011000,
+};
+unsigned char menorque[7] = {
+    0b000100,
+    0b001000,
+    0b010000,
+    0b100000,
+    0b010000,
+    0b001000,
+    0b000100,
+};
+unsigned char mayorque[7] = {
+    0b010000,
+    0b001000,
+    0b000100,
+    0b000010,
+    0b000100,
+    0b001000,
+    0b010000,
+};
+
+unsigned char guion_bajo[7] = {
+    0b000000,
+    0b000000,
+    0b000000,
+    0b000000,
+    0b000000,
+    0b111110,
+    0b000000,
+};
+
+unsigned char puntocoma[7] = {
+    0b000000, 
+	0b010000,
+	0b000000,
+	0b000000,
+	0b001000,
+	0b010000,
+	0b000000
 };
 
 #endif

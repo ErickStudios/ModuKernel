@@ -4,6 +4,27 @@
 #include "../../library/lib.hpp"
 // el inline
 #include "inline.hpp"
+/// @brief tipos de variables
+enum VariableBuiltInTypes {
+    BuiltIn_u8,
+    BuiltIn_i8,
+    BuiltIn_u32,
+    BuiltIn_i32
+};
+/// @brief las variables
+struct VariableModuCandy {
+    ModuLibCpp::String Name;
+    int Offset;
+    VariableBuiltInTypes Type;
+
+    // Constructor por defecto
+    VariableModuCandy()
+        : Name(""), Offset(0), Type(BuiltIn_u8) {}
+
+    // Constructor con parámetros
+    VariableModuCandy(const ModuLibCpp::String& n, int off, VariableBuiltInTypes t)
+        : Name(n), Offset(off), Type(t) {}
+};
 /// @brief convierte un candy var (r1, r2, r3, ...) a registros (eax, ecx, edx, ...)
 /// @param CandyVar el registro
 /// @return el registro
@@ -45,6 +66,12 @@ ModuLibCpp::String ParseCode(ModuLibCpp::String& Code)
     ModuLibCpp::String CodeRet{""};
     ModuLibCpp::String WordSymbol{""};
     ModuLibCpp::String TypeUse{""};
+    ModuLibCpp::String DataSection{"DATA_MODUCANDY_DATA:\n   call DATA_MODUCANDY_DATA_GETEIP\n   ret\n   ;datas\n"};
+    ModuLibCpp::String DatasReal{""};
+    ModuLibCpp::String DatasFunctions{"; ModuCandy: eip get runtime for data calc\nDATA_MODUCANDY_DATA_GETEIP:\n   pop eax\n   push eax\n   inc eax\n   ret"};
+
+    ModuLibCpp::Array<VariableModuCandy> Variables{};
+    int offset_actual = 0;
 
     bool in_comment = false;
     bool type_usage = false;
@@ -95,6 +122,39 @@ ModuLibCpp::String ParseCode(ModuLibCpp::String& Code)
 
                     CodeRet << ModuLibCpp::String{"; type="} << TypeUse << ModuLibCpp::String{"\n"} << FuncName << ModuLibCpp::String{":\n"};
                 }
+                // funciones
+                else if (WordSymbol == "let") {
+                    // avanzar hasta el primer caracter no espacio
+                    ++it;
+                    while (*it == ' ' || *it == '\t') ++it;
+
+                    // acumular el nombre de la función
+                    ModuLibCpp::String FuncName{""};
+                    while (IsLetter(*it)) {
+                        FuncName << *it;
+                        ++it;
+                    }
+
+                    if (TypeUse == "BuiltIn_u32" || TypeUse == "BuiltIn_i32") { 
+                        for (size_t i = 0; i < 4; i++) DatasReal << "   ret ;place for variable (u/i32)\n"; 
+                        VariableModuCandy Variable;
+                        Variable.Name.SetString(FuncName.InternalString);
+                        Variable.Type == VariableBuiltInTypes::BuiltIn_u32;
+                        Variable.Offset = offset_actual;
+                        offset_actual+=4;
+                        Variables.push(Variable);
+                    }
+                    else if (TypeUse == "BuiltIn_u8" || TypeUse == "BuiltIn_i8") { 
+                        DatasReal << "   ret ;place for variable (u/i8)\n"; 
+                        VariableModuCandy Variable;
+                        Variable.Name.SetString(FuncName.InternalString);
+                        Variable.Type == VariableBuiltInTypes::BuiltIn_u8;
+                        Variable.Offset = offset_actual;
+                        offset_actual++;
+                        Variables.push(Variable);
+                    }
+
+                }
                 TypeUse.ClearString();
             }
 
@@ -122,6 +182,32 @@ ModuLibCpp::String ParseCode(ModuLibCpp::String& Code)
                 StrUpr(WordSymbol.InternalString);
 
                 CodeRet << ModuLibCpp::String{"call "} << CandyVarToRegister(WordSymbol) << ModuLibCpp::String{"\n"};
+            }
+            else if (c == '<' && *(it + 1) == '=')
+            {
+                it+=2;
+                // acumular el nombre de la función
+                ModuLibCpp::String CandyVar{""};
+                while (IsLetter(*it)) {CandyVar << *it;++it;}
+                for (auto& i : Variables) {
+                    if (i.Name == CandyVar)
+                    {
+                        char inta[30];
+                        IntToString(i.Offset, inta);
+
+                        CodeRet <<  ModuLibCpp::String{"call DATA_MODUCANDY_DATA\n"} <<
+                            ModuLibCpp::String{"mov ebx,"} << ModuLibCpp::String{((const char*)inta)} << ModuLibCpp::String{"\n"} <<
+                            ModuLibCpp::String{"add eax,ebx\n"};
+
+                        if (i.Type == VariableBuiltInTypes::BuiltIn_u8) {
+                            CodeRet << ModuLibCpp::String{"mov "} << CandyVarToRegister(WordSymbol) <<  ModuLibCpp::String{",[eax]\n"} ;
+                        }
+                        else {
+                            CodeRet << ModuLibCpp::String{"movb al,[eax]\n"} <<
+                                        ModuLibCpp::String{"mov "} << CandyVarToRegister(WordSymbol) << ModuLibCpp::String{",eax\n"};
+                        }
+                    }
+                }
             }
             else if (c == '?')
             {
@@ -158,6 +244,32 @@ ModuLibCpp::String ParseCode(ModuLibCpp::String& Code)
                 while (IsLetter(*it)) {CandyVar << *it;++it;}
 
                 CodeRet << ModuLibCpp::String{"add "} << CandyVarToRegister(WordSymbol) << ModuLibCpp::String{","} << CandyVarToRegister(CandyVar) << ModuLibCpp::String{"\n"};
+            }
+            else if (c == '*')
+            {
+                it++;
+                // acumular el nombre de la función
+                ModuLibCpp::String CandyVar{""};
+                while (IsLetter(*it)) {CandyVar << *it;++it;}
+
+                CodeRet << ModuLibCpp::String{"SimpleMultiplication "} << CandyVarToRegister(WordSymbol) << ModuLibCpp::String{","} << CandyVarToRegister(CandyVar) << ModuLibCpp::String{"\n"};
+            }
+            else if (c == '/')
+            {
+                it++;
+                // acumular el nombre de la función
+                ModuLibCpp::String CandyVar{""};
+                while (IsLetter(*it)) {CandyVar << *it;++it;}
+
+                CodeRet << ModuLibCpp::String{"push eax\n"} 
+                        << ModuLibCpp::String{"push edx\n"} 
+                        << ModuLibCpp::String{"mov eax,"} << CandyVarToRegister(WordSymbol) << ModuLibCpp::String{"\n"}
+                        << ModuLibCpp::String{"cdq\n"} 
+                        << ModuLibCpp::String{"idiv "} << CandyVarToRegister(CandyVar) << ModuLibCpp::String{"\n"}
+                        << ModuLibCpp::String{"mov "} << CandyVarToRegister(WordSymbol) << ModuLibCpp::String{",eax\n"}
+                        << ModuLibCpp::String{"pop edx\n"} 
+                        << ModuLibCpp::String{"pop eax\n"} 
+                    ;
             }
             else if (c == '<' && *(it + 1) == '-')
             {
@@ -196,7 +308,10 @@ ModuLibCpp::String ParseCode(ModuLibCpp::String& Code)
         }
     }
 
-    return CodeRet;
+    ModuLibCpp::String FinalCode{CodeRet.InternalString};
+    FinalCode << DataSection << DatasReal << DatasFunctions;
+
+    return FinalCode;
 }
 /// @brief la shell para programar en ModuCandy
 void ModuCandyShell()

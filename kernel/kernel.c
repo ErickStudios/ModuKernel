@@ -36,6 +36,8 @@ KernelServices* GlobalServices;
 #include "../handlers/exceptions.h"
 #include "../syscalls/syscall.h"
 
+char UnableGopMode = 0;
+
 char DisplayModeType = 0;
 
 // offset
@@ -523,6 +525,7 @@ void DrawLetterOffset(int x, int y, char letter, uint8_t color, int ofX, int OfY
 	else if (letter == '/') DrawBitmap(slash_bitmap, realx, realy, color);
 	else if (letter == '=') DrawBitmap(equal_bitmap, realx, realy, color);
 	else if (letter == ':') DrawBitmap(colon_bitmap, realx, realy, color);
+	else if (letter == ';') DrawBitmap(puntocoma, realx, realy, color);
 	else if (letter == '0') DrawBitmap(num0_bitmap, realx, realy, color);
 	else if (letter == '1') DrawBitmap(num1_bitmap, realx, realy, color);
 	else if (letter == '2') DrawBitmap(num2_bitmap, realx, realy, color);
@@ -535,7 +538,10 @@ void DrawLetterOffset(int x, int y, char letter, uint8_t color, int ofX, int OfY
 	else if (letter == '9') DrawBitmap(num9_bitmap, realx, realy, color);
 	else if (letter == '.') DrawBitmap(dot_bitmap, realx, realy, color);
 	else if (letter == ',') DrawBitmap(comma_bitmap, realx, realy, color);
+	else if (letter == '<') DrawBitmap(menorque, realx, realy, color);
+	else if (letter == '>') DrawBitmap(mayorque, realx, realy, color);
 	else if (letter == '-') DrawBitmap(minussim_bitmap, realx, realy, color);
+	else if (letter == '_') DrawBitmap(guion_bajo, realx, realy, color);
 	else if (letter == '+') DrawBitmap(plus_bitmap, realx, realy, color);
 	else if (letter == '*') DrawBitmap(astherisc_bitmap, realx, realy, color);
 	else if (letter == '{') DrawBitmap(brace_left, realx, realy, color);
@@ -2718,6 +2724,8 @@ ChoseDiskToBoot:
 	Option = InternalKeyboardReadChar();
 	Option = CharToUpCase(Option);
 
+	if (Option == 'D') UnableGopMode = !UnableGopMode;
+
 	// disco duro
 	if (Option == 'A' || Option == '\n')
 		SystemCwkDisk = DiskTypeHardDisk;
@@ -2970,14 +2978,17 @@ void InternalPrintgNonLine(char *message)
 
 		while (message[letter])
 		{
-			int max_lines = 28;
+			int max_cols = 38;
+			int max_lines = 29;
 			if (line >= max_lines) {
 				char* vidmem = (char *)0xA0000;
-				int pos1 = vidmem + (((96 * 2) * (max_lines-20)) + (96 * 2));
+				int pos1 = vidmem + ((((96 * 2) * (max_lines-20)) + (96 * 2)));
 				int size = (192*2)*400;
 
-				for (size_t i = 0; i < 35; i++) DrawLetter(i,max_lines, '\a', InternalTextModeToVga(*text_attr >> 4) & 0x07);
-				for (size_t i = 0; i < 35; i++) DrawLetter(i,max_lines + 1, '\a', InternalTextModeToVga(*text_attr >> 4) & 0x07);
+				for (size_t i = 0; i < max_cols + 1; i++) DrawLetter(i,max_lines, '\a', InternalTextModeToVga(*text_attr >> 4) & 0x07);
+				for (size_t i = 0; i < max_cols + 1; i++) DrawLetter(i,max_lines + 1, '\a', InternalTextModeToVga(*text_attr >> 4) & 0x07);
+				for (size_t i = 0; i < max_cols + 1; i++) DrawLetter(i,max_lines + 2, '\a', InternalTextModeToVga(*text_attr >> 4) & 0x07);
+				for (size_t i = 0; i < max_cols + 1; i++) DrawLetter(i,max_lines + 3, '\a', InternalTextModeToVga(*text_attr >> 4) & 0x07);
 
 				InternalMemorySet(vidmem + size, 0, size);
 				InternalMemMove(vidmem, pos1, size);
@@ -2996,7 +3007,7 @@ void InternalPrintgNonLine(char *message)
 				column++;
 			}
 
-			if (column >= 35)
+			if (column >= max_cols)
 			{
 				line++;
 				column = 0;

@@ -1,0 +1,10 @@
+
+ErickMain() return
+
+// declarar variable
+Build_InInt32 let MyVariable
+
+// funcion
+Int32 fn ErickMain() {
+    r1<=MyVariable
+}

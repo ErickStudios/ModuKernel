@@ -32,6 +32,7 @@
 /home/test3.txt;SR11;SRN;
 /home/test4.txt;SR12;SRN;
 /home/test5.txt;SR13;SRN;
-/home/vmem.cdy;SR14;SRN;
+/home/var.cdy;SR14;SRN;
+/home/vmem.cdy;SR15;SRN;
 /kernel/logo.bmp;LOGOK;BMP;
 /fs.struct;FSLST;IFS;

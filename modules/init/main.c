@@ -171,7 +171,7 @@ KernelStatus ErickMain(KernelServices *Services)
 		// setear linea actual
 
 		DrawImage(
-			54,                // X destino
+			(190 - SizeX) / 2, // X destino
 			120,               // Y destino
 			SizeX,       	   // ancho
 			raw,               // datos crudos
