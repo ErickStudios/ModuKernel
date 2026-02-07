@@ -294,36 +294,6 @@ void idt_init() {
     // cargar IDT
     asm volatile("lidt %0" :: "m"(idt_ptr));
 }
-void set_gdt_entry(int num, uint32_t base, uint32_t limit, uint8_t access, uint8_t gran)
-{
-    gdt[num].base_low    = (base & 0xFFFF);
-    gdt[num].base_middle = (base >> 16) & 0xFF;
-    gdt[num].base_high   = (base >> 24) & 0xFF;
-
-    gdt[num].limit_low   = (limit & 0xFFFF);
-    gdt[num].granularity = (limit >> 16) & 0x0F;
-
-    gdt[num].granularity |= (gran & 0xF0);
-    gdt[num].access      = access;
-}
-void InternalProtectRegion(void* ptr, uint32_t size, enum GdtLevelIn level)
-{
-    uint32_t base  = (uint32_t)ptr;
-    uint32_t limit = size - 1;
-
-    uint8_t access;
-    if (level == GdtLevelInRing0) {
-        // Datos RW, presente, ring 0
-        access = 0x92;
-    } else {
-        // Datos RW, presente, ring 3
-        access = 0xF2;
-    }
-
-    uint8_t gran = 0xCF; // 4KB granularity, 32-bit
-
-    set_gdt_entry(GdtSetProtectRegion++ , base, limit, access, gran);
-}
 void InternalDecodeErickColor(uint8_t code, uint8_t out[4]) {
     // Extraer campos
     uint8_t ll = (code >> 6) & 0x03;
@@ -393,16 +363,6 @@ void init_gdt() {
     gdt[2].access       = 0x92;   // data, ring 0
     gdt[2].granularity  = 0xCF;
     gdt[2].base_high    = 0x00;
-
-    // código kernel (base=0, limit=4GB, acceso=0x9A, gran=0xCF)
-    set_gdt_entry(GDT_CODE0, 0, 0xFFFFFFFF, 0x9A, 0xCF);
-    // datos kernel (acceso=0x92)
-    set_gdt_entry(GDT_DATA0, 0, 0xFFFFFFFF, 0x92, 0xCF);
-
-    // código usuario (acceso=0xFA → ejecutable, readable, DPL=3)
-    set_gdt_entry(GDT_CODE3, 0, 0xFFFFFFFF, 0xFA, 0xCF);
-    // datos usuario (acceso=0xF2 → writable, DPL=3)
-    set_gdt_entry(GDT_DATA3, 0, 0xFFFFFFFF, 0xF2, 0xCF);
 }
 void pit_init(uint32_t freq) {
     uint16_t divisor = (uint16_t)(PIT_FREQUENCY / freq);
@@ -2693,12 +2653,11 @@ void InternalSysCommandExecute(KernelServices* Services, char* command, int lena
 }
 void k_main() 
 { 
-
 	// etapa muy temprana de c
-	
 	pic_remap();
 	idt_init();        
 	pic_unmask_irq1(); 
+	InitHeap();
 
 	// activar interrupciones
 	asm volatile("sti");
@@ -2712,37 +2671,29 @@ void k_main()
 		,0);
 
 	// opciones
-	InternalPrintg("Boot From:",5);
-	InternalPrintg("a) Hard Disk",7);
-	InternalPrintg("b) Floppy Disk",8);
-	InternalPrintg("c) CD-ROM",9);
-	InternalPrintg("Enter key for chose the Hard Disk",11);
+	InternalPrintg		("Boot From:",5);
+	InternalPrintg		("a) Hard Disk",7);
+	InternalPrintg		("b) Floppy Disk",8);
+	InternalPrintg		("c) CD-ROM",9);
+	InternalPrintg		("Enter key for chose the Hard Disk",11);
 
+	// la variable de la opcion
 	char Option = 0;
 
 ChoseDiskToBoot:
-	Option = InternalKeyboardReadChar();
-	Option = CharToUpCase(Option);
+	// la opcion
+	Option = CharToUpCase(InternalKeyboardReadChar());
 
+	// activar/desactivar el forze not enter gop mode
 	if (Option == 'D') UnableGopMode = !UnableGopMode;
 
-	// disco duro
-	if (Option == 'A' || Option == '\n')
-		SystemCwkDisk = DiskTypeHardDisk;
-	// disco floppy
-	else if (Option == 'B')
-		 SystemCwkDisk = DiskTypeFloppy;
-	// cdrom
-	else if (Option == 'C') 
-		SystemCwkDisk = DiskTypeCdRom;
-	// no es valido
-	else
-		goto ChoseDiskToBoot;
+	// opciones de arranque
+	if (Option == 'A' || Option == '\n') SystemCwkDisk = DiskTypeHardDisk;	// disco duro
+	else if (Option == 'B') SystemCwkDisk = DiskTypeFloppy;	// disco floppy
+	else if (Option == 'C') SystemCwkDisk = DiskTypeCdRom;	// cdrom
+	else goto ChoseDiskToBoot;	// no es valido
 
 	InternalDebug("ModuKernel Debug Console\n\nBienvenido a la consola de desarrollo de tu kernel basado en ModuKernel, aqui veras las noticias que mande tu sistema operativo en tiempo real, puede tambien proximamente mandar acciones al kernel y interrumpir\n");
-
-	// debuggear
-	SystemInternalMessage("ModuKernel ha entrado en C");
 
 	// etapa de arranque prematura aqui se inicializan los servicios basicos
 	// mas no los servicios del kernel donde se iniciaran prototipadamente
@@ -2750,70 +2701,21 @@ ChoseDiskToBoot:
 	// memoria actual
 	MemoryCurrentSystem = MemAllocTypeKernelServices;
 
-	// debuggear
-	SystemInternalMessage("Inicializando Heap...");
-
-	// inicializar heap para AllocatePool y FreePool
-	InitHeap();
-
-	// inicializar idt
-	idt_init();
-
-	InitializeProtection();
-
-	// debuggear
-	SystemInternalMessage("Inicializando Servicios...");
-
-	// los servicios
     KernelServices Services;
-
-	// inicializar servicios
 	InitializeKernel(&Services);
 
 	// etapa de arranque silencioso aqui se seleccionan diferentes configuraciones
 	// y otras cosas para poder inicializar los servicios de manera compleja, como
 	// la pantalla
 
-	// debuggear
-	SystemInternalMessage("Inicializando Pantalla...");
-
 	// setear el servicio acutal de la pantalla
     Services.Display->Set(Services.Display);
-	// setear atributos
     Services.Display->setAttrs(0, 7);
-	// limpiar la pantalla
     Services.Display->clearScreen();
 
 	// etapa de arranque en esta etapa ya es visible para el usuario, ya casi todo
 	// el kernel esta medio despierto, incluyendo los serviicos de pantalla, disco,
 	// memoria y otros, asi que ya le pueden mostarar al usuario
-
-	// ir a la posicion x0y0
-	Services.Display->setCursorPosition(0,0);
-
-	// debuggear
-	SystemInternalMessage("Empezando a arrancan");
-
-	// imprimir la promocion
-	Services.Display->printg("ErickCraftStudios ModuKernel (Operating System)\n\n");
-	Services.Display->printg("powered By ModuKernel - https://github.com/ErickStudios/ModuKernel\n\n");
-	Services.Time->TaskDelay(20);
-	Services.Display->printg("puedes apoyarnos en github con el enlaze, estamos arrancando el Kernel, espere\n");
-	Services.Display->printg("[ KSuccess   ]  Kernel Cargado\n");
-	Services.Display->printg("[ KSuccess   ]  Kernel Configurado\n");
-	Services.Display->printg("cargando kernel\n");
-	Services.Time->TaskDelay(40);
-
-	// limpiar la pantalla
-	Services.Display->clearScreen();
-	
-	// proteger regiones
-	InternalProtectRegion(heap_start, sizeof(heap_start), GdtLevelInRing0);
-	InternalProtectRegion(heap_ptr, sizeof(heap_ptr), GdtLevelInRing0);
-	
-	// esto no es otra etapa de arranque, sigue siendo la etapa de arranque normal
-	// aunque aqui se hace una animacion para que no se vea muy cutre, recuerden, pueden
-	// personalizarla si se basan en el kernel
 
 	InCaseOfViolationOfSecurity = &&EnCasoDePageFaultMuyGrave;
 

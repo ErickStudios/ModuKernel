@@ -1,0 +1,14 @@
+// mi variable
+BuiltIn_u32 let MiVariable
+
+// no necesita un entry point, puede ser plano
+
+// setea la variable MiVariable
+r1<=MiVariable                                      // carga la direccion de la variable en eax
+r2=5                                                // mueve el valor 5 a ecx
+unsafe "mov [eax],ecx"                              // setea la direccion a la que apunta eax con el valor de ecx como dword
+
+// obtener el valor
+r1<=MiVariable                                      // carga la direccion de la variable en eax
+unsafe "mov eax,[eax]"                              // obtiene en eax el valor dword al que apunta eax (donde cargo la variable)
+return                                              // hace ret, en ModuCandy el return no lleva ningun parametro, el valor de retorno esta en r1 (eax) que es donde se guarda el valor de retorno en C cuando se usa un (int)funcion()
