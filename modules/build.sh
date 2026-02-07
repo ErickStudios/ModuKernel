@@ -38,3 +38,6 @@ compile_cpp modules/regex/tregex.cpp build/moddrivers/trex.modubin "Simple Regex
 # Assembler and ModuCandy Compiler                                                                              ( in /dev )
 compile_cpp modules/compiler/basic.cpp build/modules/mas.modubin "ModuAssembler assembler"                      # ModuAssembler assembler
 compile_cpp modules/compiler/moducandy.cpp build/modules/mcandy.modubin "ModuCandy Compiler"                    # ModuCandy Compiler
+
+# Image Inspector                                                                                               ( in /kernel )
+compile_cpp modules/gallery/icat.cpp build/modules/icat.modubin "Image Inspector"                               # Image Inspector

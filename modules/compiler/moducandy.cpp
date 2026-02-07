@@ -139,7 +139,7 @@ ModuLibCpp::String ParseCode(ModuLibCpp::String& Code)
                         for (size_t i = 0; i < 4; i++) DatasReal << "   ret ;place for variable (u/i32)\n"; 
                         VariableModuCandy Variable;
                         Variable.Name.SetString(FuncName.InternalString);
-                        Variable.Type == VariableBuiltInTypes::BuiltIn_u32;
+                        Variable.Type = VariableBuiltInTypes::BuiltIn_u32;
                         Variable.Offset = offset_actual;
                         offset_actual+=4;
                         Variables.push(Variable);
@@ -148,7 +148,7 @@ ModuLibCpp::String ParseCode(ModuLibCpp::String& Code)
                         DatasReal << "   ret ;place for variable (u/i8)\n"; 
                         VariableModuCandy Variable;
                         Variable.Name.SetString(FuncName.InternalString);
-                        Variable.Type == VariableBuiltInTypes::BuiltIn_u8;
+                        Variable.Type = VariableBuiltInTypes::BuiltIn_u8;
                         Variable.Offset = offset_actual;
                         offset_actual++;
                         Variables.push(Variable);
@@ -199,13 +199,6 @@ ModuLibCpp::String ParseCode(ModuLibCpp::String& Code)
                             ModuLibCpp::String{"mov ebx,"} << ModuLibCpp::String{((const char*)inta)} << ModuLibCpp::String{"\n"} <<
                             ModuLibCpp::String{"add eax,ebx\n"};
 
-                        if (i.Type == VariableBuiltInTypes::BuiltIn_u8) {
-                            CodeRet << ModuLibCpp::String{"mov "} << CandyVarToRegister(WordSymbol) <<  ModuLibCpp::String{",[eax]\n"} ;
-                        }
-                        else {
-                            CodeRet << ModuLibCpp::String{"movb al,[eax]\n"} <<
-                                        ModuLibCpp::String{"mov "} << CandyVarToRegister(WordSymbol) << ModuLibCpp::String{",eax\n"};
-                        }
                     }
                 }
             }

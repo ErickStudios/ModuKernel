@@ -1,0 +1,16 @@
+// llamar al Main
+ErickMain() return
+
+// variables para ver que es portable la alineacion
+BuiltIn_u32 let Dummy
+BuiltIn_u8 let Dummy2
+// declarar variable
+BuiltIn_u32 let MyVariable
+
+// funcion
+Int32 fn ErickMain() {
+    // setear variable a 5
+    r1<=MyVariable r2=5 unsafe "mov [eax],ecx"
+    // obtener su valor y retornarlo
+    r1<=MyVariable unsafe "mov eax,[eax]" return
+}
