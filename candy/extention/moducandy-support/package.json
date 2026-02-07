@@ -1,0 +1,36 @@
+{
+  "name": "moducandy-support",
+  "displayName": "ModuCandy Support",
+  "description": "soporte para ModuCandy",
+  "version": "0.0.1",
+  "main": "./main.js",
+  "engines": {
+    "vscode": "^1.109.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "moducandy.convertToAsm",
+        "title": "Convert to asm"
+      }
+    ],
+    "languages": [
+      {
+        "id": "moducandy",
+        "aliases": ["ModuCandy", "moducandy"],
+        "extensions": [".cdy"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "moducandy",
+        "scopeName": "source.cdy",
+        "path": "./syntaxes/moducandy.tmLanguage.json"
+      }
+    ]
+  }
+}

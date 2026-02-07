@@ -1,0 +1,101 @@
+{
+	"$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+	"name": "ModuCandy",
+	"patterns": [
+		{
+			"include": "#keywords"
+		},
+		{
+			"include": "#strings"
+		},
+		{
+			"include": "#functions"
+		},
+		{
+			"include": "#comments"
+		},
+		{
+			"include": "#operations"
+		},
+		{
+			"include": "#variables"
+		}
+	],
+	"repository": {
+		"variables": {
+			"patterns": [
+				{
+				"match": "\\b([A-Z]\\w*)\\s+(\\blet\\b)\\s+(\\w+)",
+				"captures": {
+					"1": { "name": "entity.name.class.moducandy" },   
+					"2" : { "name": "keyword.moducandy" },
+					"3": { "name": "variable.moducandy" }
+				}
+				}
+			]
+		},
+		"functions": {
+			"patterns": [
+				{
+				"match": "\\b([A-Z]\\w*)\\s+(\\bfn\\b)\\s+(\\w+)\\s*\\(\\)",
+				"captures": {
+					"1": { "name": "entity.name.class.moducandy" },   
+					"2" : { "name": "keyword.moducandy" },
+					"3": { "name": "entity.name.function.moducandy" }
+				}
+				},
+				{
+					"name": "entity.name.function.moducandy",
+					"match": "\\w+(?=\\(\\))"
+				}
+			]
+		},
+		"keywords": {
+			"patterns": [{
+				"name": "keyword.moducandy",
+				"match": "\\b(unsafe|fn)\\b"
+			},
+			{
+				"name": "keyword.control.moducandy",
+				"match": "\\b(return)\\b"
+			}]
+		},
+		"operations": {
+		"patterns": [
+			{
+				"match": "(\\b(?:r1|r2|r3|r4|r5|r6)\\b)(\\+|\\-|\\*|/|\\?|\\=)(\\b(?:r1|r2|r3|r4|r5|r6)\\b)",
+				"captures": {
+					"1": { "name": "variable.moducandy" },   
+					"2": { "name": "keyword.operator.moducandy" }, 
+					"3": { "name": "variable.moducandy" }
+				}
+			},
+			{
+				"match": "(\\b(?:r1|r2|r3|r4|r5|r6)\\b)(\\=)(\\d+)",
+				"captures": {
+					"1": { "name": "variable.moducandy" },
+					"2": { "name": "keyword.operator.assignment.moducandy" },
+					"3": { "name": "constant.numeric.moducandy" }
+				}
+			}
+		]
+		},
+		"comments": {
+			"name" : "comment",
+			"begin": "//",
+			"end": "\n"
+		},
+		"strings": {
+			"name": "string.quoted.double.moducandy",
+			"begin": "\"",
+			"end": "\"",
+			"patterns": [
+				{
+					"name": "constant.character.escape.moducandy",
+					"match": "\\\\."
+				}
+			]
+		}
+	},
+	"scopeName": "source.cdy"
+}
