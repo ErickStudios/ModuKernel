@@ -1,0 +1,17 @@
+// la suma
+CandyNumber fn Suma() {
+    // codigo                |      ensamblador resultado
+    r2<-                            // push ecx
+    r1=5 r1+r1 r2=2 r1-r2           // expresion de (5+5)-2
+    ->r2                            // pop ecx
+    return                          // retornar registro
+}
+
+// esto es una funcion
+KernelStatus fn ErickMain() {
+    // sumar
+    Suma()                          // ejecutar la suma
+
+    // retornar
+    return                          // retornar status
+}

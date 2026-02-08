@@ -260,6 +260,7 @@ unconfig_mode:
 ; esta secuencia se probo primero con comandos y se implemento la secuencia interna
 ; despues
 InternalGopScreenInit:
+
 	mov al,[UnableGopMode]
 	cmp al,1
 	je config_mode_ret

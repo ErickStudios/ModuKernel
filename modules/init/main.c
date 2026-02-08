@@ -101,11 +101,6 @@ void DrawImage(int x, int y, int wd, unsigned char* img, int size, uint8_t chrom
     for (int i = 0; i < size; i++) {
         uint8_t color = img[i];
 
-		char bf[20];
-		IntToString((int)color, bf);
-
-		InternalDebug(bf);
-
         if (xM >= (x + wd)) {
             xM = x;
             yM++;

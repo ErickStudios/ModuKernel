@@ -92,6 +92,7 @@ extern function InternalSendCharToSerial(char ch);
 extern function InternalKernelHaltReal();
 extern function isr_keyboard_stub();
 extern function isr_idt_stub();
+extern function SetPaletteColor(char index, char r, char g, char b);
 
 // pit
 #define PIT_FREQUENCY     1193182
@@ -312,7 +313,6 @@ void InternalDecodeErickColor(uint8_t code, uint8_t out[4]) {
 
     out[3] = ll;               // brillo (opcional)
 }
-extern void SetPaletteColor(char index, char r, char g, char b);
 void ColorLoopSystem()
 {
 	for (int i = 0; i < 256; i++)
@@ -382,8 +382,8 @@ uint16_t pit_read_counter() {
 }
 void InternalDrawPixel(uint8_t color, int x, int y) 
 {
-    uint8_t* vram = (uint8_t*)0xA0000;
-    vram[y*(96 * 2) + x] = color;
+	uint8_t* vram = (uint8_t*)0xA0000;
+	vram[y*(96 *2) + x] = color;
 }
 void InternalBlitingRectangle(uint8_t color, int x, int y, int SizeX, int SizeY)
 {
@@ -724,11 +724,12 @@ void InternalGetDateTime(KernelDateTime* Time) {
 }
 void InternalWaitEticks(int Unities)
 {
-	// esperar
-	for (size_t i = 0; i < (5999999 * Unities); i++) { 
-		// para delay
-		int ala = ((10/2)*3); 
-	}
+	int POLD = PitCounter;
+
+	int WaitReal = Unities * 2;
+	int Make = POLD + WaitReal;
+
+	while (PitCounter < Make);
 }
 uint8_t InternalLrgbToVga(uint8_t l, uint8_t r, uint8_t g, uint8_t b)
 {
@@ -2658,6 +2659,7 @@ void k_main()
 	idt_init();        
 	pic_unmask_irq1(); 
 	InitHeap();
+	pit_init(50);
 
 	// activar interrupciones
 	asm volatile("sti");
@@ -2703,6 +2705,7 @@ ChoseDiskToBoot:
 
     KernelServices Services;
 	InitializeKernel(&Services);
+	InternalDebug("a");
 
 	// etapa de arranque silencioso aqui se seleccionan diferentes configuraciones
 	// y otras cosas para poder inicializar los servicios de manera compleja, como
@@ -2712,12 +2715,14 @@ ChoseDiskToBoot:
     Services.Display->Set(Services.Display);
     Services.Display->setAttrs(0, 7);
     Services.Display->clearScreen();
+	InternalDebug("b");
 
 	// etapa de arranque en esta etapa ya es visible para el usuario, ya casi todo
 	// el kernel esta medio despierto, incluyendo los serviicos de pantalla, disco,
 	// memoria y otros, asi que ya le pueden mostarar al usuario
 
 	InCaseOfViolationOfSecurity = &&EnCasoDePageFaultMuyGrave;
+	InternalDebug("c");
 
 EnCasoDePageFaultMuyGrave:
 	// esto se puede llamar o si el kernel esta iniciando o si por seguridad alguien

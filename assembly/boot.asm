@@ -1,6 +1,7 @@
 
 ; principal
 start:
+	
 	; nivel de privilegios
 	mov dword [InternalRingLevel],0 ; nivel
 
@@ -86,7 +87,7 @@ pre_c_boot_stage2:
 	; inicializar gdt
 	call init_gdt				; funciones de gdt, esto es en C por que no tenia idea de como hacerlo en ASM asi que es una excepcion a pre-C, luego cambia a asm, no se preocupen
 	lgdt [gdt_ptr]       		; carga la GDT definida en C
-	
+
 	; recargas
 	jmp 0x08:flush_cs    		; far jump para recargar CS
 	hlt							; que diablos tiene que pasar para que pase eso?

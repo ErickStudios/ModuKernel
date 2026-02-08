@@ -236,6 +236,7 @@ EOF
 
 # crear disco
 grub-mkrescue -o build/os.iso config;dd if=/dev/zero of=build/floppy.img bs=1024 count=1440
+
 # crear el floppy
 mkfs.fat -F 12 build/floppy.img;mkdir -p /mnt/qemu_floppy;sudo mount -o loop build/floppy.img /mnt/qemu_floppy
 # como plus puedes usar tambien una unidad de floppy disk

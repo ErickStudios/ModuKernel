@@ -1,0 +1,15 @@
+// llamar al ErickMain
+ErickMain() return
+
+/// r1/eax=num1
+/// r2/ecx=num2
+/// r1/eax=retval
+Int32 fn Suma() {
+    r1+r2 return
+}
+
+/// el punto de entrada del kernel
+/// r1/r2=variables
+KernelStatus fn ErickMain() {
+    r1=32 r2=16 Suma() return
+}
