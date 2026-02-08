@@ -55,7 +55,10 @@
 				"captures": {
 					"1": { "name": "entity.name.class.moducandy" },   
 					"2" : { "name": "keyword.moducandy" },
-					"3": { "name": "entity.name.function.moducandy" }
+					"3": { "patterns": [
+						{"match": "(\\w+)\\:\\:(?=\\w+)","captures": {"1": {"name": "entity.name.class"} }},
+						{"name": "entity.name.function.moducandy" ,"match": "\\w+"}
+					]}
 				}
 				},
 				{
@@ -81,7 +84,10 @@
 				"captures": {
 					"1": { "name": "variable.moducandy" },   
 					"2": { "name": "keyword.operator.moducandy" }, 
-					"3": { "name": "variable.moducandy" }
+					"3": { "patterns": [
+						{"match": "(\\w+)\\:\\:(?=\\w+)","captures": {"1": {"name": "entity.name.class"} }},
+						{"name": "variable.moducandy" ,"match": "\\w+"}
+					]}
 				}
 			},
 			{

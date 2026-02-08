@@ -20,6 +20,8 @@ typedef KernelStatus (*KernelSimpleDiskReadSector)(unsigned int lba, unsigned ch
 typedef struct _FatFile (*KernelSimpleDiskOpen)(char* path);
 /* para cerrar un archivo */
 typedef void (*KernelSimpleDiskCloseFile)(struct _FatFile File);
+/* para escribir en un archivo */
+typedef void (*KernelSimpleDiskWriteFile)(struct _FatFile File, void* content, int size);
 /* servicios de disco */
 typedef struct _DiskServices {
     /* funcion para ejecutar un archivo, esta funcion requiere
@@ -57,5 +59,8 @@ typedef struct _DiskServices {
     DiskTypePort* CurrentDiskType;
     /* para cerrar el archivo */
     KernelSimpleDiskCloseFile CloseFile;
+    /* escribe en un archivo, el primer parametro es el archivo fat, el segundo
+    el contenido como objeto y el tercero el tamaño */
+    KernelSimpleDiskWriteFile WriteFile;
 } DiskServices;
 #endif

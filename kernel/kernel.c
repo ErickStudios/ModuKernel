@@ -812,6 +812,28 @@ void InitHeap()
 
     free_list = first;
 }
+unsigned int FatFileGetFirstSector(FatFile* file) {
+    struct _FAT12_BootSector* bs = file->bs;
+    struct _FAT12_DirEntry* dir = &file->sector;
+
+    unsigned int first_cluster = dir->first_cluster;
+    unsigned int root_sectors = (bs->root_entries * 32) / bs->bytes_per_sector;
+    unsigned int data_region_start = bs->reserved_sectors + bs->num_fats * bs->fat_size_sectors + root_sectors;
+
+    unsigned int first_sector = data_region_start + (first_cluster - 2) * bs->sectors_per_cluster;
+    return first_sector;
+}
+unsigned int FatFileGetContentSector(FatFile* file) {
+    struct _FAT12_BootSector* bs = file->bs;
+    struct _FAT12_DirEntry* dir = &file->sector;
+
+    unsigned int first_cluster = dir->first_cluster;
+    unsigned int root_sectors = (bs->root_entries * 32) / bs->bytes_per_sector;
+    unsigned int data_region_start = bs->reserved_sectors + bs->num_fats * bs->fat_size_sectors + root_sectors;
+
+    unsigned int sector = data_region_start + (first_cluster - 2) * bs->sectors_per_cluster;
+    return sector;
+}
 KernelStatus InternalFloppyDiskReadSector(unsigned int lba, unsigned char* buffer_phys)
 {
     // 1. LBA -> CHS
@@ -962,6 +984,150 @@ KernelStatus InternalRealDiskReadSector(unsigned int lba, unsigned char* buffer,
 KernelStatus InternalDiskReadSector(unsigned int lba, unsigned char* buffer) 
 {
 	InternalRealDiskReadSector(lba, buffer, SystemCwkDisk);
+}
+KernelStatus InternalFloppyDiskWriteSector(unsigned int lba, unsigned char* buffer_phys)
+{
+    // 1. LBA -> CHS
+    unsigned int cyl = lba / (2 * 18);
+    unsigned int head = (lba / 18) % 2;
+    unsigned int sec = (lba % 18) + 1;
+
+    // 2. Encender motor
+    outb(FDC_DOR, 0x1C);
+
+    // 3. Programar DMA canal 2 para escribir 512 bytes desde buffer_phys
+    outb(DMA_MASK, 0x06);
+    outb(DMA_CLEARFF, 0x00);
+    outb(DMA_MODE, 0x5A); // canal 2, write, single, address inc
+    outb(DMA_CH2_ADDR, (uint8_t)((uint32_t)buffer_phys & 0xFF));
+    outb(DMA_CH2_ADDR, (uint8_t)(((uint32_t)buffer_phys >> 8) & 0xFF));
+    outb(DMA_CH2_PAGE, (uint8_t)(((uint32_t)buffer_phys >> 16) & 0xFF));
+    outb(DMA_CLEARFF, 0x00);
+    outb(DMA_CH2_COUNT, 0xFF);
+    outb(DMA_CH2_COUNT, 0x01);
+    outb(DMA_MASK, 0x02);
+
+    // 4. WRITE DATA (0x05)
+    fdc_write(0x05);
+    fdc_write((head << 2) | 0x00);
+    fdc_write(cyl);
+    fdc_write(head);
+    fdc_write(sec);
+    fdc_write(0x02); // tamaño = 512 bytes
+    fdc_write(18);   // EOT
+    fdc_write(0x1B); // GAP3
+    fdc_write(0xFF); // DTL
+
+    // 5. Esperar IRQ6 y leer result bytes
+    // espera_irq6();
+    uint8_t st0 = fdc_read();
+    uint8_t st1 = fdc_read();
+    uint8_t st2 = fdc_read();
+    // validar errores
+
+    outb(FDC_DOR, 0x0C);
+    return KernelStatusSuccess;
+}
+KernelStatus InternalAtaDiskWriteSector(unsigned int lba, unsigned char* buffer)
+{
+    // esperar BSY=0 antes de enviar parámetros
+    while (inb(0x1F7) & 0x80);
+
+    outb(0x1F6, 0xE0 | ((lba >> 24) & 0x0F));
+    outb(0x1F2, 1);
+    outb(0x1F3, (uint8_t) lba);
+    outb(0x1F4, (uint8_t)(lba >> 8));
+    outb(0x1F5, (uint8_t)(lba >> 16));
+    outb(0x1F7, 0x30); // WRITE SECTOR
+
+    // esperar DRQ=1 con timeout
+    int timeout = 100000;
+    while (!(inb(0x1F7) & 0x08) && timeout--) 
+        if (timeout < 1) return KernelStatusInfiniteLoopTimeouted;
+
+    // escribir datos
+    for (int i = 0; i < 256; i++) outw(0x1F0, ((uint16_t*)buffer)[i]);
+
+    // esperar BSY=0 con timeout
+    timeout = 100000;
+    while ((inb(0x1F7) & 0x80) && timeout--) 
+        if (timeout < 1) return KernelStatusInfiniteLoopTimeouted;
+
+    // verificar error
+    if (inb(0x1F7) & 0x01) return KernelStatusDiskServicesDiskErr;
+
+    return KernelStatusSuccess;
+}
+KernelStatus InternalRealDiskWriteSector(unsigned int lba, unsigned char* buffer, DiskTypePort FileSystem)
+{
+    return (
+        (FileSystem == DiskTypeHardDisk) ? InternalAtaDiskWriteSector(lba, buffer) :
+        (FileSystem == DiskTypeFloppy)   ? InternalFloppyDiskWriteSector(lba, buffer) :
+        KernelStatusInvalidParam
+    );
+}
+FatFileLocation InternalDiskFindFileLocation(char* name, char* ext) {
+    uint8_t sector0[512];
+    InternalDiskReadSector(0, sector0);
+
+    struct _FAT12_BootSector* bs_local = (struct _FAT12_BootSector*) sector0;
+    struct _FAT12_BootSector* bs = (struct _FAT12_BootSector*) AllocatePool(sizeof(*bs));
+    if (!bs) return (FatFileLocation){0,0};
+    InternalMemoryCopy(bs, bs_local, sizeof(*bs));
+
+    unsigned int root_start = bs->reserved_sectors + bs->num_fats * bs->fat_size_sectors;
+    unsigned int root_sectors = (bs->root_entries * 32) / bs->bytes_per_sector;
+
+    uint8_t* root_buffer = (uint8_t*) AllocatePool(bs->bytes_per_sector * root_sectors);
+    if (!root_buffer) return (FatFileLocation){0,0};
+
+    for (int s = 0; s < root_sectors; s++)
+        InternalDiskReadSector(root_start + s, root_buffer + s * bs->bytes_per_sector);
+
+    struct _FAT12_DirEntry* dir = (struct _FAT12_DirEntry*) root_buffer;
+    int total_entries = bs->root_entries;
+
+    for (int i = 0; i < total_entries; i++) {
+        if (dir[i].name[0] == 0x00 || dir[i].name[0] == 0xE5) continue;
+
+        if (InternalMemoryComp(dir[i].name, name, 8) == 0 &&
+            InternalMemoryComp(dir[i].name + 8, ext, 3) == 0) {
+            
+            FatFileLocation loc;
+            loc.SectorStart = root_start + (i * 32) / bs->bytes_per_sector;
+            loc.Offset      = (i * 32) % bs->bytes_per_sector;
+            return loc;
+        }
+    }
+
+    return (FatFileLocation){0,0};
+}
+KernelStatus InternalReplaceFileFatEntry(FatFile File, FatFile Replacer)
+{
+    // localizar la entrada original
+    FatFileLocation Locate = InternalDiskFindFileLocation(File.sector.name, File.sector.name + 8);
+
+    char buf[512];
+    KernelStatus Status = InternalDiskReadSector(Locate.SectorStart, buf);
+
+	if (Status) return Status;
+
+    // puntero a la entrada dentro del sector
+    struct _FAT12_DirEntry* entry = (struct _FAT12_DirEntry*)(buf + Locate.Offset);
+
+    // copiar la nueva entrada (solo 32 bytes)
+    InternalMemoryCopy(entry, &(Replacer.sector), sizeof(struct _FAT12_DirEntry));
+
+    // escribir el sector modificado
+    Status = InternalRealDiskWriteSector(Locate.SectorStart, buf, SystemCwkDisk);
+	if (Status) return Status;
+
+    char buf2[512];
+	InternalDiskReadSector(Locate.SectorStart, buf2);
+	
+	if (InternalMemoryComp(buf, buf2, 512) != 0) while (1);
+
+	return KernelStatusSuccess;
 }
 void InternalCloseFile(FatFile File)
 {
@@ -1121,6 +1287,17 @@ char* InternalReadLine()
 		}
 	}
 }
+unsigned char* LoadFAT(struct _FAT12_BootSector* bs) {
+    unsigned int fat_size = bs->fat_size_sectors * bs->bytes_per_sector;
+    unsigned char* fat = (unsigned char*) AllocatePool(fat_size);
+    if (!fat) return NULL;
+
+    // La FAT empieza justo después de los sectores reservados
+    for (int s = 0; s < bs->fat_size_sectors; s++) {
+        InternalDiskReadSector(bs->reserved_sectors + s, fat + s * bs->bytes_per_sector);
+    }
+    return fat;
+}
 KernelStatus InternalDiskGetFile(FatFile file, void** content, int* size)
 {
 	// si el archivo esta eliminado no se esta
@@ -1194,6 +1371,31 @@ KernelStatus InternalDiskGetFile(FatFile file, void** content, int* size)
     *size    = dir.file_size;
 
 	FreePool(fat);
+    return KernelStatusSuccess;
+}
+KernelStatus InternalDiskWriteFile(FatFile file, void* content, int size) {
+    struct _FAT12_BootSector* bs = file.bs;
+    struct _FAT12_DirEntry* entry = &file.sector;
+
+    unsigned short cluster = entry->first_cluster;
+    unsigned char* fat = LoadFAT(bs); // leer FAT completa
+
+    int written = 0;
+    while (cluster < 0xFF8 && written < size) {
+        int sector = FatClusterToSector(bs, cluster);
+        char buffer[512];
+        int to_write = min(512, size - written);
+
+        InternalMemoryCopy(buffer, (unsigned char*)content + written, to_write);
+        InternalRealDiskWriteSector(sector, buffer, SystemCwkDisk);
+
+        written += to_write;
+        cluster = get_fat_entry(cluster, fat); // siguiente clúster
+    }
+
+    // actualizar tamaño en la entrada
+    entry->file_size = size;
+    InternalReplaceFileFatEntry(file, file);
     return KernelStatusSuccess;
 }
 void InternalSetAttriubtes(char bg, char fg)
@@ -1534,6 +1736,7 @@ void InitializeKernel(KernelServices* Services)
     Dsk->ReadSector 	= &InternalDiskReadSector;
 	Dsk->OpenFile 		= &InternalExtendedFindFile;
 	Dsk->CloseFile		= &InternalCloseFile;
+	Dsk->WriteFile		= &InternalDiskWriteFile;
 
 	Dsk->CurrentDiskType= &SystemCwkDisk;
 
@@ -1978,8 +2181,10 @@ void InternalSysCommandExecute(KernelServices* Services, char* command, int lena
 		CurrentWorkDirectory[CwdCurrentCharacter] = 0;
 		CwdLevelDir++;
 	}
-	else if (StrCmp(command ,"ls") == 0)
+	else if (StrCmp(command ,"ls") == 0 || StrCmp(command, "ls -s") == 0)
 	{ 
+		bool ls_legacy = 0;
+		if (StrCmp(command, "ls -s") == 0) ls_legacy = 1;
 		FatFile StructureFs = Services->File->FindFile("FSLST   ", "IFS");
 		void* StructFs; int FsSize;
 		KernelStatus StructureFound = Services->File->GetFile(StructureFs, &StructFs, &FsSize);
@@ -1988,7 +2193,7 @@ void InternalSysCommandExecute(KernelServices* Services, char* command, int lena
 		char MaxRecorrer = 5;
 		char* Directory = CurrentWorkDirectory;
 
-		if (!_StatusError(StructureFound))
+		if (!_StatusError(StructureFound) && ls_legacy == 0)
 		{
 			char* text = (char*)StructFs;
 			char* parts[128]; // espacio para líneas
@@ -2726,7 +2931,7 @@ ChoseDiskToBoot:
 	// memoria y otros, asi que ya le pueden mostarar al usuario
 
 	InCaseOfViolationOfSecurity = &&EnCasoDePageFaultMuyGrave;
-
+	
 EnCasoDePageFaultMuyGrave:
 	// esto se puede llamar o si el kernel esta iniciando o si por seguridad alguien
 	// violo las leyes del kernel, a diferencia de las excepciones en vez de terminar el programa

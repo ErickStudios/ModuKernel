@@ -14,6 +14,11 @@ typedef struct _FAT12_DirEntry
     uint32_t file_size;            // 28
 } __attribute__((packed)) FAT12_DirEntry;
 
+typedef struct _FatFileLocation {
+    unsigned int SectorStart;
+    unsigned int Offset;
+} FatFileLocation;
+
 typedef struct _FAT12_BootSector {
     unsigned char jump[3];
     char oem[8];
@@ -70,4 +75,10 @@ FileAddress InternalFat12GetFileIndex(FatFile File)
     addr.pos = 0; // inicio del sector
 
     return addr;
+}
+
+unsigned int FatClusterToSector(struct _FAT12_BootSector* bs, unsigned short cluster) {
+    unsigned int root_dir_sectors = ((bs->root_entries * 32) + (bs->bytes_per_sector - 1)) / bs->bytes_per_sector;
+    unsigned int data_region_start = bs->reserved_sectors + (bs->num_fats * bs->fat_size_sectors) + root_dir_sectors;
+    return data_region_start + (cluster - 2) * bs->sectors_per_cluster;
 }

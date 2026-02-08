@@ -52,6 +52,8 @@ void* InternalMemorySet(void* dest, int value, unsigned int count)
     return dest;
 }
 
+#define min(a,b) ((a) < (b) ? (a) : (b))
+
 int InternalMemoryComp(const void *s1, const void *s2, unsigned int n) {
     const unsigned char *p1 = (const unsigned char*)s1;
     const unsigned char *p2 = (const unsigned char*)s2;
