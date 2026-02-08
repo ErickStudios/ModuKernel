@@ -1,5 +1,7 @@
 #include "exint.h"
 
+extern void* InCaseOfViolationOfSecurity;
+
 void KillProcess(regs_t* r)
 {
     char reg_gs[9]; char reg_fs[9]; char reg_es[9]; char reg_ds[9];                             
@@ -20,8 +22,11 @@ void KillProcess(regs_t* r)
     RegisterPrint(ebx); RegisterPrint(edx); RegisterPrint(ecx); RegisterPrint(eax);       
     GlobalServices->Display->printg("\n");                              
     RegisterPrint(eip); RegisterPrint(cs); RegisterPrint(eflags);        
-    GlobalServices->Display->printg("\n");                                               
-    if (ExceptionHandlePtr) r->eip = (uint32_t)ExceptionHandlePtr;                              
+    GlobalServices->Display->printg("\n");
+    if (r->eip == 0) {
+        r->eip = (uint32_t)InCaseOfViolationOfSecurity;
+    }
+    else if (ExceptionHandlePtr) r->eip = (uint32_t)ExceptionHandlePtr;
 }
 
 #include "exceptions/div0.h"

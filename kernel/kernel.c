@@ -268,12 +268,10 @@ static void pic_unmask_irq1(void) {
     uint8_t imr = inb(0x21);      // PIC maestro
     outb(0x21, imr & ~0x02);      // desmascara bit 1 (IRQ1)
 }
-void idt_init() {
-    idt_ptr.limit = sizeof(idt) - 1;
-    idt_ptr.base  = (uint32_t)&idt;
-
-    InternalMemorySet(&idt, 0, sizeof(idt));
-
+void init_keyboard() {
+	set_idt_entry(0x21, (uint32_t)isr_keyboard_stub,  0x08, 0x8E);
+}
+void init_exceptions() {
 	// division por 0
     set_idt_entry(0, (uint32_t)IdtDivideBy0, 0x08, 0x8E);
 	// overlow
@@ -282,13 +280,16 @@ void idt_init() {
 	set_idt_entry(8, (uint32_t)IdtExPageFault, 0x08, 0x8E);
 	// page fault
 	set_idt_entry(14, (uint32_t)IdtExPageFault, 0x08, 0x8E);
+}
+void idt_init() {
+    idt_ptr.limit = sizeof(idt) - 1;
+    idt_ptr.base  = (uint32_t)&idt;
+
+    InternalMemorySet(&idt, 0, sizeof(idt));
 
 	// llamadas
 	set_idt_entry(0x80, (uint32_t)IdtSystemCall, 0x08, 0x8E);
 
-	// teclado
-	set_idt_entry(0x21, (uint32_t)isr_keyboard_stub,  0x08, 0x8E);
-	
 	// pic
 	set_idt_entry(32, (uint32_t)isr_idt_stub,  0x08, 0x8E);
 
@@ -2656,7 +2657,9 @@ void k_main()
 { 
 	// etapa muy temprana de c
 	pic_remap();
-	idt_init();        
+	idt_init();
+	init_keyboard();
+	init_exceptions();
 	pic_unmask_irq1(); 
 	InitHeap();
 	pit_init(50);
@@ -2678,6 +2681,8 @@ void k_main()
 	InternalPrintg		("b) Floppy Disk",8);
 	InternalPrintg		("c) CD-ROM",9);
 	InternalPrintg		("Enter key for chose the Hard Disk",11);
+	InternalPrintg		("d) enable/unable 0xB8000 forze (cant change to 0xA0000)",13);
+	InternalPrintg		("e) exit kernel",14);
 
 	// la variable de la opcion
 	char Option = 0;
@@ -2688,6 +2693,7 @@ ChoseDiskToBoot:
 
 	// activar/desactivar el forze not enter gop mode
 	if (Option == 'D') UnableGopMode = !UnableGopMode;
+	else if (Option == 'E') InternalKernelReset(0);
 
 	// opciones de arranque
 	if (Option == 'A' || Option == '\n') SystemCwkDisk = DiskTypeHardDisk;	// disco duro
@@ -2705,7 +2711,6 @@ ChoseDiskToBoot:
 
     KernelServices Services;
 	InitializeKernel(&Services);
-	InternalDebug("a");
 
 	// etapa de arranque silencioso aqui se seleccionan diferentes configuraciones
 	// y otras cosas para poder inicializar los servicios de manera compleja, como
@@ -2715,14 +2720,12 @@ ChoseDiskToBoot:
     Services.Display->Set(Services.Display);
     Services.Display->setAttrs(0, 7);
     Services.Display->clearScreen();
-	InternalDebug("b");
 
 	// etapa de arranque en esta etapa ya es visible para el usuario, ya casi todo
 	// el kernel esta medio despierto, incluyendo los serviicos de pantalla, disco,
 	// memoria y otros, asi que ya le pueden mostarar al usuario
 
 	InCaseOfViolationOfSecurity = &&EnCasoDePageFaultMuyGrave;
-	InternalDebug("c");
 
 EnCasoDePageFaultMuyGrave:
 	// esto se puede llamar o si el kernel esta iniciando o si por seguridad alguien

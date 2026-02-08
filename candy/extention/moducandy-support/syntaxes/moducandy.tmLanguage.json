@@ -19,13 +19,19 @@
 		},
 		{
 			"include": "#variables"
+		},
+		{
+			"include": "#modules"
+		},
+		{
+			"include": "#modern"
 		}
 	],
 	"repository": {
 		"variables": {
 			"patterns": [
 				{
-				"match": "\\b([A-Z]\\w*)\\s+(\\blet\\b)\\s+(\\w+)",
+				"match": "\\b([A-Z]\\w*)\\s+(\\blet\\b)\\s+([\\w:.]+)",
 				"captures": {
 					"1": { "name": "entity.name.class.moducandy" },   
 					"2" : { "name": "keyword.moducandy" },
@@ -34,10 +40,18 @@
 				}
 			]
 		},
+		"modules": {
+			"patterns": [{
+				"match": "(\\w+)\\:\\:(?=\\w+)",
+				"captures": {
+					"1": {"name": "entity.name.class"}
+				}
+			}]
+		},
 		"functions": {
 			"patterns": [
 				{
-				"match": "\\b([A-Z]\\w*)\\s+(\\bfn\\b)\\s+(\\w+)\\s*\\(\\)",
+				"match": "\\b([A-Z]\\w*)\\s+(\\bfn\\b)\\s+([\\w:.]+)\\s*\\(\\)",
 				"captures": {
 					"1": { "name": "entity.name.class.moducandy" },   
 					"2" : { "name": "keyword.moducandy" },
@@ -53,7 +67,7 @@
 		"keywords": {
 			"patterns": [{
 				"name": "keyword.moducandy",
-				"match": "\\b(unsafe|fn)\\b"
+				"match": "\\b(unsafe|fn|candy|let)\\b"
 			},
 			{
 				"name": "keyword.control.moducandy",
@@ -95,6 +109,15 @@
 					"match": "\\\\."
 				}
 			]
+		},
+		"modern": {
+			"patterns": [{
+				"match": "(\\bpbl\\b) (\\b(candy|fn)\\b)",
+				"captures": {
+					"1": {"name": "keyword.moducandy"},
+					"2": {"name": "keyword.moducandy"}
+				}
+			}]
 		}
 	},
 	"scopeName": "source.cdy"

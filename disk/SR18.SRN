@@ -1,39 +1,4 @@
-/// un programa que programa la memoria de video
-/// unsafe sirve para insertar codigo assembly
+Build_InInt32 let miU32
 
-Main() return
-
-Int32 fn PutByte() {
-    unsafe "movb [eax],cl"
-    unsafe "inc eax" 
-    unsafe "inc ecx" 
-    return
-}
-
-Int32 fn loopend() {
-    return
-}
-
-Int32 fn loop() {
-    PutByte()
-    r1?r3 =loopend unsafe "jmp LOOP"
-}
-
-Int32 fn Set() {
-    r3+r4 r3+r4 r3+r4 r3+r4 r3+r4 r3+r4 r3+r4 r3+r4 r3+r4 r3+r4 r3+r4 r3+r4 return
-}
-
-Int32 fn Main() { 
-    r1=655360 r2=1 r3=r1 r4=160 
-    Set() Set() Set() Set()
-    Set() Set() Set() Set()
-    Set() Set() Set() Set()
-    Set() Set() Set() Set()
-    Set() Set() Set() Set()
-    Set() Set() Set() Set()
-    Set() Set() Set() Set()
-
-    loop()
-
-    r1=0 return
-}
+r1<=miU32 r2=4 unsafe "mov [eax],ecx"
+r1<=miU32 unsafe "mov eax,[eax]" return

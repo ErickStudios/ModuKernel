@@ -1,4 +1,1 @@
-Build_InInt32 let miU32
-
-r1<=miU32 r2=4 unsafe "mov [eax],ecx"
-r1<=miU32 unsafe "mov eax,[eax]" return
+tomatos potatos

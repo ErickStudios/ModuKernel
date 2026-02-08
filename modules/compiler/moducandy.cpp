@@ -25,6 +25,23 @@ struct VariableModuCandy {
     VariableModuCandy(const ModuLibCpp::String& n, int off, VariableBuiltInTypes t)
         : Name(n), Offset(off), Type(t) {}
 };
+/// @brief codigo ModuCandy
+struct ModuCandyCode {
+    ModuLibCpp::Array<VariableModuCandy> Vars;
+    ModuLibCpp::String DatasFunctions;
+    ModuLibCpp::String DatasReal;
+    ModuLibCpp::String DataSection;
+    ModuLibCpp::String CodeRet;
+    ModuLibCpp::String FinalCode;
+    // Constructor por defecto
+    ModuCandyCode() 
+        : Vars(),
+          DatasFunctions(""),
+          DatasReal(""),
+          DataSection(""),
+          CodeRet(""),
+          FinalCode("") {}
+};
 /// @brief convierte un candy var (r1, r2, r3, ...) a registros (eax, ecx, edx, ...)
 /// @param CandyVar el registro
 /// @return el registro
@@ -55,13 +72,52 @@ bool IsLetter(char c) {
     if (c == '_') return true;
     // si es
     if (c == '[' || c == ']') return true;
+    // si es de namespace
+    if (c == ':' || c == '.') return true;
 
     return false;
 }
-/// @brief parsea un codigo ModuCandy a ensamblador MAS
+char* FindModule(ModuLibCpp::String& Name) {
+
+    // archivo
+    FatFile ModuCandyFile = gSys->File->OpenFile("/lib/candy/lib.candydep");
+    ObjectAny ModuCandyFileContent;
+    Entero ModuCandyFileSize;
+    KernelStatus ModuCandyOpen = (KernelStatus)gSys->File->GetFile(ModuCandyFile, &ModuCandyFileContent, &ModuCandyFileSize);
+
+    char* buf[100];
+    int lines = StrSplit((char*)ModuCandyFileContent, (char**)buf, '\n');
+
+    for (size_t i = 0; i < lines; i++)
+    {
+        char* line = buf[i];
+        char* buf_line[4];
+        int pls = StrSplit(line, (char**)buf_line, ';');
+
+        char* ModPath = buf_line[0];
+        char* ModName = buf_line[1];
+
+        if (StrCmp(ModName, Name.InternalString) == 0)
+        {
+            FatFile ModuleFile = gSys->File->OpenFile(ModPath);
+            ObjectAny ModuleFileContent;
+            Entero ModuleFileSize;
+
+            KernelStatus FileOp = (KernelStatus)gSys->File->GetFile(ModuleFile, &ModuleFileContent, &ModuleFileSize);
+            if (FileOp == KernelStatusSuccess) 
+            {
+                ((char*)ModuleFileContent)[ModuleFileSize] = '\0';
+                return (char*)ModuleFileContent;
+            }
+        }
+    }
+
+    return nullptr;
+}
+/// @brief parsea un codigo a datos
 /// @param Code el codigo
 /// @return el codigo ensamblador
-ModuLibCpp::String ParseCode(ModuLibCpp::String& Code)
+ModuCandyCode ParseCodeInternal(ModuLibCpp::String& Code)
 {
     ModuLibCpp::String CodeRet{""};
     ModuLibCpp::String WordSymbol{""};
@@ -160,6 +216,27 @@ ModuLibCpp::String ParseCode(ModuLibCpp::String& Code)
 
             if (WordSymbol == "return") {
                 CodeRet << ModuLibCpp::String{"ret\n"};
+            }
+            else if (WordSymbol == "pbl") {
+                it++;
+                while (IsLetter(*it)) {++it;}
+
+            }
+            else if (WordSymbol == "candy")
+            {
+                it++;
+                // acumular el nombre de la función
+                ModuLibCpp::String CandyVar{""};
+                while (IsLetter(*it)) {CandyVar << *it;++it;}
+
+                char* xd = FindModule(CandyVar);
+
+                if (xd != nullptr)
+                {
+                    ModuLibCpp::String ModuleCode{(const char*)xd};
+                    ModuCandyCode Cd = ParseCodeInternal(ModuleCode);
+                    CodeRet << Cd.CodeRet;
+                }
             }
             else if (WordSymbol == "unsafe") {
                 it++;
@@ -300,11 +377,25 @@ ModuLibCpp::String ParseCode(ModuLibCpp::String& Code)
             WordSymbol.ClearString();
         }
     }
-
+    
     ModuLibCpp::String FinalCode{CodeRet.InternalString};
     FinalCode << DataSection << DatasReal << DatasFunctions;
+    
+    ModuCandyCode Exported{};
+    Exported.Vars = Variables;
+    Exported.DatasFunctions.SetString(DatasFunctions.InternalString);
+    Exported.DatasReal.SetString(DatasReal.InternalString);
+    Exported.DataSection.SetString(DataSection.InternalString);
+    Exported.CodeRet.SetString(CodeRet.InternalString);
+    Exported.FinalCode.SetString(FinalCode.InternalString);
 
-    return FinalCode;
+    return Exported;
+}
+/// @brief parsea un codigo ModuCandy a ensamblador MAS
+/// @param Code el codigo
+/// @return el codigo ensamblador
+ModuLibCpp::String ParseCode(ModuLibCpp::String& Code) {
+    return ParseCodeInternal(Code).FinalCode;
 }
 /// @brief la shell para programar en ModuCandy
 void ModuCandyShell()

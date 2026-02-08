@@ -1,21 +1,13 @@
-; no mames, era la epoca de los mainframes
-;
-; aquellos colosos que costaban millones y parecian sacados de una pelicula de ciencia ficcion
-; parece que se retrocedio alli
-; 
-; este es un codigo assembly para ModuAssembler
-
-; el inicio
-START:
-    ; guardar ebx
-    push ebx                                ; guardar
-
-    ; eax=5+5
-    mov eax,5                               ; mover el valor
-    add eax,eax                             ; sumar eax+eax
-
-    ; eax=eax-2
-    mov ebx,2                               ; el valor
-    sub eax,ebx                             ; restar
-    pop ebx                                 ; recuperar ebx
-    ret
+ErickMain() return
+/// helper para retornar algo
+Int32 fn returne() { return }
+// loop de la potencia
+Int32 fn potenciaLoop() { r1*r3 unsafe "dec ecx" r4=0 r2?r4 =returne unsafe "jmp POTENCIALOOP" }
+// funcion de potencia
+Int32 fn potencia() { ->r3 ->r2 -> r1 r3<- r3=r1 unsafe "jmp POTENCIALOOP"}
+// el main
+Int32 fn ErickMain() {
+    r1=4 r2=3 r1<- r2<- potencia()
+    r1=r1
+    return
+}

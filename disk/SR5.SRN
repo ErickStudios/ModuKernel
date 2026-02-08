@@ -1,10 +1,20 @@
-# este es un script que se pasara al sistema de archivos
-# de la maquina virtual
 
-echo Hola desde un archivo externo
+jmp BF
+jmp BF
+jmp BF
 
-call lpp
+mov eax,eax
+mov ecx,ecx
+mov ebx,ebx
+mov eax,eax
+mov ecx,ecx
+mov ebx,ebx
 
-hlt:
-    jmp hlt
-    ret
+BF:
+    mov eax,eax
+    mov ecx,ecx
+    mov ebx,ebx
+    mov eax,eax
+    mov ecx,ecx
+    mov ebx,ebx
+    jmp BF

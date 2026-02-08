@@ -1,20 +1,15 @@
-
-jmp BF
-jmp BF
-jmp BF
-
-mov eax,eax
-mov ecx,ecx
-mov ebx,ebx
-mov eax,eax
-mov ecx,ecx
-mov ebx,ebx
-
-BF:
-    mov eax,eax
-    mov ecx,ecx
-    mov ebx,ebx
-    mov eax,eax
-    mov ecx,ecx
-    mov ebx,ebx
-    jmp BF
+/// si son iguales
+Int32 fn IsEqual() { 
+    r1=0 return
+}
+/// si no son iguales
+Int32 fn IsNotEqual() {
+    r1=1 return 
+}
+/// r1=retval
+KernelStatus fn ErickMain() {
+    // setear valores
+    r1=5 r2=6                               // setear valores
+    // comparar valores
+    r1?r2 =IsEqual IsNotEqual()             // si es igual o no igual
+}

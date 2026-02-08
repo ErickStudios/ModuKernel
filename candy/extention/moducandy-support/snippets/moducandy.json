@@ -1,0 +1,9 @@
+{
+  "BuiltIn type": {
+    "prefix": "builtInTypes",
+    "body": [
+      "${2:BuiltIn_${1|u32,i32,u8,i8|}}"
+    ],
+    "description": "Snippet para crear BuiltIn con fn o let"
+  }
+}

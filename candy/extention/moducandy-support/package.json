@@ -25,6 +25,12 @@
         "configuration": "./language-configuration.json"
       }
     ],
+    "snippets": [
+      {
+        "language": "moducandy",
+        "path": "./snippets/moducandy.json"
+      }
+    ],
     "grammars": [
       {
         "language": "moducandy",

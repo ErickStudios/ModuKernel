@@ -190,6 +190,19 @@ if [ "$UnableUserFiles" = false ]; then
         let afaf=afaf+1
     done
 fi
+# contador
+afaf=0
+# bucle
+for file in candy/lib/*; do
+    # nombre
+    name=$(basename "$file")
+    # copiar
+    cp "$file" "disk/CDY$afaf.CDY"
+    # agregar al fsmap
+    echo "/lib/candy/$name;CDY$afaf;CDY;" >> disk/FSLST.IFS
+    # siguiente archivo
+    let afaf=afaf+1
+done
 
 python rscripts/moducraw.py modules/init/image_array.h disk/LOGOK.BMP
 echo "/kernel/logo.bmp;LOGOK;BMP;" >> disk/FSLST.IFS
