@@ -100,9 +100,38 @@ namespace ModuLibCpp
 
         T& operator[](int index) { return data[index]; }
 
+        void insert(int index, const T& value) {
+            if (index < 0 || index > count) return; // validar rango
+            if (count >= capacity) resize(capacity * 2);
+
+            // desplazar elementos hacia la derecha
+            for (int i = count; i > index; --i) {
+                data[i] = data[i - 1];
+            }
+
+            data[index] = value;
+            count++;
+        }
+        void remove(int index) {
+            if (index < 0 || index >= count) return; // validar rango
+
+            // desplazar elementos hacia la izquierda
+            for (int i = index; i < count - 1; ++i) {
+                data[i] = data[i + 1];
+            }
+
+            count--; // reducir tamaño lógico
+        }
         T* begin() { return data; }
         T* end() { return data + count; }
+        int getCount() { return count; }
     };    
+    /// @brief para separar un string
+    /// @param str el string
+    /// @param buffer el buffer
+    /// @param splitter el splitter
+    /// @return la cantidad
+    int StrSplitArray(char* str, Array<char*>& buffer, char splitter);
     /// @brief clase de i/o avanzado
     class InputOutput {
     public:
@@ -122,6 +151,15 @@ namespace ModuLibCpp
         /// @brief inicializa el string
         /// @param String el string
         String(const char* str) {
+            size_t len = StrLen(str) + 1; // +1 para el terminador '\0'
+            InternalString = (char*) gMS->AllocatePool(len);
+            if (InternalString) {
+                gMS->CoppyMemory(InternalString, str, len);
+            }
+        }
+        /// @brief constructor por defecto
+        String() {
+            char* str = "";
             size_t len = StrLen(str) + 1; // +1 para el terminador '\0'
             InternalString = (char*) gMS->AllocatePool(len);
             if (InternalString) {
@@ -189,6 +227,14 @@ namespace ModuLibCpp
         String& operator<<(char c) {
             AddChar(c);
             return *this;
+        }
+        /// @brief separa el string
+        /// @param c el caracter separador
+        /// @return el string
+        Array<char*> operator/(char c) {
+            Array<char*> Items{};
+            StrSplitArray(InternalString, Items, c);
+            return Items;
         }
         /// @brief operador << como alias de juntar string
         /// @param c el string a añadir
@@ -395,4 +441,35 @@ namespace ModuLibCpp
     using str = String;
     /// @brief alias para el string
     using string = str;
+    /// @brief para separar un string
+    /// @param str el string
+    /// @param buffer el buffer
+    /// @param splitter el splitter
+    /// @return la cantidad
+    int StrSplitArray(char* str, Array<char*>& buffer, char splitter)
+    {
+        int count = 0;
+        char* token = str;
+
+        while (*str)
+        {
+            if (*str == splitter)
+            {
+                *str = '\0';             // cortar aquí
+                buffer.push(token);      // guardar inicio del token
+                count++;
+                token = str + 1;         // siguiente token
+            }
+            str++;
+        }
+
+        // último token
+        if (*token != '\0')
+        {
+            buffer.push(token);
+            count++;
+        }
+
+        return count;
+    }
 }

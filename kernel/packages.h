@@ -8,6 +8,8 @@ void InternalPackageLaunch(KernelPackageType Type, uint32_t Data)
     KernelPackage Package;
     Package.Author = Type;
     Package.Data   = Data;
+    Package.IsBus = ((char)(0x80 >> 7));
+    Package.BusTimeOut = 5;
 
     // reservar nuevo espacio
     KernelPackage* New = (KernelPackage*) AllocatePool(sizeof(KernelPackage) * (PackagesIndexCount + 1));
@@ -52,4 +54,13 @@ KernelPackage InternalPackageCatch() {
 
     // Devolver el paquete extraído
     return pkg;
+}
+KernelStatus packages_gc(regs_t* r) {
+    free_gc:
+        if (PackagesKernel[PackagesIndexCount - 1].IsBus) 
+        {
+            if (PackagesKernel[PackagesIndexCount - 1].BusTimeOut > 0) PackagesKernel[PackagesIndexCount - 1].BusTimeOut--;
+            else { KernelPackage Anonymus = InternalPackageCatch(); }
+        }
+    return KernelStatusSuccess;
 }

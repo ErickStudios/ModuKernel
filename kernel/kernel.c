@@ -2,6 +2,7 @@
 #include "../services/KernelServices.h"
 #include "kernel.h"
 #include "../fs/fat12.h"
+#include "../fs/erickfs.h"
 
 // incluir funciones y prototipos
 #include "../functions/misc_main.h"
@@ -236,12 +237,13 @@ void InternalSecurityModifier(regs_t* r)
     }
 }
 void pic_handler(regs_t* r) {
-	// contador mas
-	PitCounter++;
-	// hacer seguridad
-	InternalSecurityModifier(r);
+	// acciones multitarea
+	InternalSecurityModifier (r);				// verificar integridad
+	packages_gc (r);							// recolector de buses basuar
+
 	// interrupcion terminada
-    outb(0x20, 0x20); 
+	PitCounter++;								// incrementar los eticks que pasaron
+    outb(0x20, 0x20); 							// terminar la interrupcion
 }
 static void pic_remap(void) {
     // ICW1: iniciar
@@ -1102,6 +1104,78 @@ FatFileLocation InternalDiskFindFileLocation(char* name, char* ext) {
 
     return (FatFileLocation){0,0};
 }
+KernelStatus ErickFsFindFile(const char* filename, void** content, unsigned int* size)
+{
+    uint8_t tableSector[512];
+    unsigned int sector = 2; // inicio de la tabla
+    unsigned int entriesPerSector = 32; // 16 bytes por entrada
+    unsigned int entrySize = sizeof(ErickFileEntry);
+
+    // leer primer sector con info global
+    ErickFsFirstSector info;
+    uint8_t infoBuf[512];
+    InternalDiskReadSector(1, infoBuf);
+    InternalMemoryCopy(&info, infoBuf, sizeof(ErickFsFirstSector));
+
+    unsigned int totalFiles = info.TotalFiles;
+
+    for (unsigned int i = 0; i < totalFiles; i++) {
+        if (i % entriesPerSector == 0) {
+            InternalDiskReadSector(sector, tableSector);
+            sector++;
+        }
+
+        ErickFileEntry* entry = (ErickFileEntry*)(tableSector + (i % entriesPerSector) * entrySize);
+
+        // leer nombre
+        uint8_t nameBuf[512];
+        InternalDiskReadSector(entry->FileNamePtr / 512, nameBuf);
+
+        if (StrCmp((char*)nameBuf, filename) == 0) {
+            *size = entry->FileContentSize;
+
+            // reservar memoria dinámica
+            *content = AllocatePool(entry->FileContentSize);
+
+            // leer contenido multisector
+            unsigned int remaining = *size;
+            unsigned int offset = 0;
+            unsigned int sectorIndex = entry->FileContentPtr / 512;
+
+            while (remaining > 0) {
+                uint8_t sectorBuf[512];
+                InternalDiskReadSector(sectorIndex, sectorBuf);
+
+                unsigned int copySize = (remaining >= 512) ? 512 : remaining;
+                InternalMemoryCopy((uint8_t*)(*content) + offset, sectorBuf, copySize);
+
+                remaining -= copySize;
+                offset += copySize;
+                sectorIndex++;
+            }
+
+            return KernelStatusSuccess;
+        }
+    }
+
+    return KernelStatusNotFound;
+}
+int GetFsType() {
+	char buffer[512];
+	InternalDiskReadSector(0, buffer);
+
+	char* fsname = buffer + 0x36;
+	fsname[8] = 0;
+
+	if (StrCmp(fsname, "FAT12   ") == 0)
+	{
+		return 0;
+	}
+	else if (StrCmp(fsname, "ErickFS ") == 0)
+	{
+		return 1;
+	}
+}
 KernelStatus InternalReplaceFileFatEntry(FatFile File, FatFile Replacer)
 {
     // localizar la entrada original
@@ -1300,6 +1374,12 @@ unsigned char* LoadFAT(struct _FAT12_BootSector* bs) {
 }
 KernelStatus InternalDiskGetFile(FatFile file, void** content, int* size)
 {
+	if (GetFsType() == 1)
+	{
+		ErickFsFindFile(file.ErickFSFileName, content, size);
+		return KernelStatusSuccess;
+	}
+
 	// si el archivo esta eliminado no se esta
     if (file.sector.name[0] == 0x00) return KernelStatusNotFound;
 
@@ -1762,6 +1842,13 @@ void InitializeKernel(KernelServices* Services)
 }
 FatFile InternalExtendedFindFile(char* path)
 {
+	if (GetFsType() == 1)
+	{
+		FatFile file;
+		file.ErickFSFileName = path;
+		return file;
+	}
+
     // Abrir tabla FSLST.IFS
     FatFile file = GlobalServices->File->FindFile("FSLST   ", "IFS");
 
@@ -2931,7 +3018,7 @@ ChoseDiskToBoot:
 	// memoria y otros, asi que ya le pueden mostarar al usuario
 
 	InCaseOfViolationOfSecurity = &&EnCasoDePageFaultMuyGrave;
-	
+
 EnCasoDePageFaultMuyGrave:
 	// esto se puede llamar o si el kernel esta iniciando o si por seguridad alguien
 	// violo las leyes del kernel, a diferencia de las excepciones en vez de terminar el programa

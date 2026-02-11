@@ -3,7 +3,8 @@
 /kernel/init;AC2;BIN;
 /kernel/mas;AC3;BIN;
 /kernel/mcandy;AC4;BIN;
-/kernel/modush;AC5;BIN;
+/kernel/medit;AC5;BIN;
+/kernel/modush;AC6;BIN;
 /dev/mps2;DV0;BIN;
 /dev/mups2;DV1;BIN;
 /dev/pci;DV2;BIN;

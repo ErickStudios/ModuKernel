@@ -41,3 +41,4 @@ compile_cpp modules/compiler/moducandy.cpp build/modules/mcandy.modubin "ModuCan
 
 # Image Inspector                                                                                               ( in /kernel )
 compile_cpp modules/gallery/icat.cpp build/modules/icat.modubin "Image Inspector"                               # Image Inspector
+compile_cpp modules/editor/medit.cpp build/modules/medit.modubin "ModuEditor editor"                            # ModuEditor editor

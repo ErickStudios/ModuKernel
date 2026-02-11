@@ -1,3 +1,5 @@
+#include "erickfs.h"
+
 typedef struct _FAT12_DirEntry
 {
     uint8_t  name[11];             // 0
@@ -45,6 +47,7 @@ typedef struct _FatFile {
     struct _FAT12_BootSector* bs;
     struct _FAT12_DirEntry sector;
     struct _FAT12_DirEntry* dir;
+    char* ErickFSFileName;
 } FatFile;
 
 unsigned short get_fat_entry(unsigned short cluster, unsigned char* fat) {
