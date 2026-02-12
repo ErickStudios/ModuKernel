@@ -1,4 +1,4 @@
-/// libreria de C++ v0.1 para ModuKernel (library/lib.hpp)
+/// libreria de C++ v0.3 para ModuKernel (library/lib.hpp)
 
 /// pragma once
 #pragma once
@@ -61,7 +61,30 @@ void operator delete[](void* p, std::size_t) noexcept {
 namespace ModuLibCpp
 {
     /// @brief version de la libreria
-    const double LibraryVersion = 0.1;
+    const double LibraryVersion = 0.3;
+    /// @brief un par
+    /// @tparam A el tipo del a
+    /// @tparam B el tipo del b
+    template <typename A, typename B>
+    struct Pair {
+        /// @brief el primero
+        A first;
+        /// @brief el segundo
+        B second;
+    };
+    /// @brief el tipo de tercero
+    /// @tparam A el tipo del a
+    /// @tparam B el tipo del b
+    /// @tparam C el tipo del c
+    template <typename A, typename B, typename C>
+    struct ThridyPair {
+        /// @brief el primero
+        A first;
+        /// @brief el segundo
+        B second;
+        /// @brief el tercero
+        C third;
+    };
     /// @brief el array
     /// @tparam T el tipo
     template<typename T>
@@ -414,33 +437,56 @@ namespace ModuLibCpp
         /// @return la caja
         Box& operator=(Box&& other) noexcept { if (this != &other) { delete Content; Content = other.Content; other.Content = nullptr;} return *this; }
     };
-    /// @brief un par
-    /// @tparam A el tipo del a
-    /// @tparam B el tipo del b
-    template <typename A, typename B>
-    struct Pair {
-        /// @brief el primero
-        A first;
-        /// @brief el segundo
-        B second;
-    };
-    /// @brief el tipo de tercero
-    /// @tparam A el tipo del a
-    /// @tparam B el tipo del b
-    /// @tparam C el tipo del c
-    template <typename A, typename B, typename C>
-    struct ThridyPair {
-        /// @brief el primero
-        A first;
-        /// @brief el segundo
-        B second;
-        /// @brief el tercero
-        C third;
-    };
     /// @brief alias para los de pythn
     using str = String;
     /// @brief alias para el string
     using string = str;
+    /// @brief clase de mapa
+    /// @tparam K el key
+    /// @tparam V el value
+    template<typename K, typename V>
+    class Map {
+        Array<Pair<K,V>> data; // núcleo
+
+    public:
+        Map(int initialCapacity = 4) : data(initialCapacity) {}
+
+        void insert(const K& key, const V& value) {
+            // si ya existe la clave, actualizar
+            for (int i = 0; i < data.size(); i++) {
+                if (data[i].key == key) {
+                    data[i].value = value;
+                    return;
+                }
+            }
+            // si no existe, agregar nuevo par
+            data.push({key, value});
+        }
+
+        bool remove(const K& key) {
+            for (int i = 0; i < data.size(); i++) {
+                if (data[i].key == key) {
+                    data.remove(i);
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        V* find(const K& key) {
+            for (int i = 0; i < data.size(); i++) {
+                if (data[i].key == key) {
+                    return &data[i].value;
+                }
+            }
+            return nullptr; // no encontrado
+        }
+
+        int size() const { return data.size(); }
+
+        Pair<K,V>* begin() { return data.begin(); }
+        Pair<K,V>* end() { return data.end(); }
+    };
     /// @brief para separar un string
     /// @param str el string
     /// @param buffer el buffer

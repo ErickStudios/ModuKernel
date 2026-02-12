@@ -1,12 +1,12 @@
-// funcion de final de potencia
-BuiltIn_Void fn Lib::Math::SimplePowEnd() {
+/// funcion de final de potencia
+BuiltIn_Void fn Lib::Math::SimplePowEnd() { 
     return
 }
-// funcion del loop de potencia
+/// funcion del loop de potencia
 BuiltIn_Void fn Lib::Math::SimplePowLoop() {
     r1*r3 unsafe "dec ecx" r4=0 r2?r4 =Lib::Math::SimplePowEnd unsafe "jmp LIB::MATH::SIMPLEPOWLOOP" 
 }
-// funcion de potencia simple
+/// funcion de potencia
 BuiltIn_i32 fn Lib::Math::SimplePow() {
     ->r3 ->r2 ->r1 r3<- r3=r1 unsafe "jmp LIB::MATH::SIMPLEPOWLOOP"
 }

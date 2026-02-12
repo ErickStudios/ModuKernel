@@ -1,3 +1,13 @@
+const {PathDependy, checkDependenceTree} = require("./dependy.js")
+const fs = require("fs");
+
+class Enums {
+  static TypeOfData = {
+    Function: 0,
+    Variable: 1
+  };
+}
+
 function candyVarToRegister(candyVar) {
   switch (candyVar) {
     case "r1": return "eax";
@@ -33,7 +43,12 @@ class VariableModuCandy {
   }
 }
 
-function parseCode(code) {
+function parseCodeInternal(code) {
+  /** @type { Map<string, number>} */
+  let Symbols = new Map();
+
+  let Tabulators = "   ";
+
   let codeRet = "";
   let wordSymbol = "";
   let typeUse = "";
@@ -76,19 +91,20 @@ DATA_MODUCANDY_DATA_GETEIP:
       if (wordSymbol.length === 0 && c >= 'A' && c <= 'Z') {
         typeUsage = true;
       }
+
+      if (typeUsage)
+      {
+        typeUse += c;
+      }
       wordSymbol += c;
       continue;
     }
 
     // cierre de palabra
-    if (wordSymbol.length > 0) {
-
     if (typeUsage) {
-        typeUse = wordSymbol;
         typeUsage = false;
       }
       else if (typeUse !== "") {
-
           // fn
           if (wordSymbol === "fn") {
             i++;
@@ -99,6 +115,7 @@ DATA_MODUCANDY_DATA_GETEIP:
               funcName += code[i++];
             }
 
+            Symbols.set(funcName, Enums.TypeOfData.Function);
             codeRet += `; type=${typeUse}\n${funcName}:\n`;
           }
 
@@ -112,6 +129,45 @@ DATA_MODUCANDY_DATA_GETEIP:
               varName += code[i++];
             }
 
+            let compileAsStru = false;
+            for (let av of variables)
+            {
+              let a = typeUse;
+              a += "::__New__";
+
+              if (av.name == a)
+              {
+                compileAsStru = true;
+                for (let av2 of variables) {
+                  let str2 = av2.name;
+                  let str1 = typeUse + "::";
+                  let len = str1.length;
+                  let comparate = str2.startsWith(str1) ? 0 : -1;
+
+                    console.log("str2:", str2);
+                    console.log("str1:", str1);
+                    console.log("len:", len);
+
+                  if (comparate == 0)
+                  {
+                    str2 = str2.substring(len);
+                    // simular el ret ;place for a struct field
+                    for (let i = 0; i < (av2.type === "u32" ? 4 : ( av2.type == "stru" ? 0 : 1)); i++) {
+                        datasReal += "   ret ;place for a struct field\n";
+                    }
+
+                    let Variable = new VariableModuCandy(varName + "::" + str2, av2.type, offsetActual);
+
+                    offsetActual += (av2.type === "u32" ? 4 : ( av2.type == "stru" ? 0 : 1));
+                    Symbols.set(Variable.name, Enums.TypeOfData.Variable);
+                    variables.push(Variable);
+                  }
+                }
+                break;
+              }
+            }
+            if (compileAsStru == false) {
+              Symbols.set(varName, Enums.TypeOfData.Variable);
             if (typeUse === "BuiltIn_u32" || typeUse === "BuiltIn_i32") {
               for (let a = 0; a < 4; a++) {
                 datasReal += "   ret ;place for variable (u/i32)\n";
@@ -129,16 +185,50 @@ DATA_MODUCANDY_DATA_GETEIP:
                 new VariableModuCandy(varName, "u8", offsetActual)
               );
               offsetActual += 1;
-            }
+            }}
           }
 
           typeUse = "";
       }
       if (wordSymbol === "return") {
-          codeRet += "ret\n";
+          codeRet += Tabulators + "ret\n";
+      }
+      else if (wordSymbol == "stru") {
+          i++;
+        let candyVar = "";
+        while (isLetter(code[i])) {
+            candyVar += code[i];
+            i++;
+        }
+        Symbols.set(candyVar + "::__New__", Enums.TypeOfData.Variable);
+        variables.push(new VariableModuCandy(candyVar + "::__New__", "stru", 0));
+
+      }
+      else if (wordSymbol === "candy") {
+        i++;
+        let candyVar = "";
+        while (isLetter(code[i])) {
+            candyVar += code[i];
+            i++;
+        }
+
+        try {
+          let deptree = checkDependenceTree();
+          
+          for (const dep of deptree) {
+            if (dep.logica_nsp == candyVar)
+            {
+              let depa = parseCodeInternal(fs.readFileSync(dep.directory, "utf-8"));
+              codeRet += depa.codeRet;
+              Symbols = new Map([...Symbols, ...depa.Symbols]);
+              break;
+            }
+          }
+        } catch (error) {
+        }
       }
       else if (wordSymbol === "unsafe") {
-      i++;
+          i++;
           if (code[i] === '"') {
               let assemblyCode = "";
               i++;
@@ -146,19 +236,19 @@ DATA_MODUCANDY_DATA_GETEIP:
               assemblyCode += code[i];
               i++;
               }
-              codeRet += assemblyCode + "\n";
+              codeRet += Tabulators + assemblyCode + "\n";
           }
       }
       else if (c === '/' && code[i + 1] === '/') {
         inComment = true;
-        codeRet += ';';
+        codeRet += Tabulators + ';';
         i++;
       }
       else if (c === '(' && code[i + 1] === ')') {
       i++;
 
       let upper = wordSymbol.toUpperCase();
-      codeRet += "call " + candyVarToRegister(upper) + "\n";
+      codeRet += Tabulators + "call " + candyVarToRegister(upper) + "\n";
       }
       else if (c === '<' && code[i + 1] === '=') {
       i += 2;
@@ -169,13 +259,11 @@ DATA_MODUCANDY_DATA_GETEIP:
           i++;
       }
 
-        console.log(variables);
-
       for (const v of variables) {
           if (v.name === candyVar) {
-          codeRet +=
-              "call DATA_MODUCANDY_DATA\n" +
-              "mov ebx," + v.offset + "\n" +
+          codeRet += Tabulators +
+              "call DATA_MODUCANDY_DATA\n" + Tabulators +
+              "mov ebx," + v.offset + "\n" + Tabulators +
               "add eax,ebx\n";
           }
       }
@@ -189,7 +277,7 @@ DATA_MODUCANDY_DATA_GETEIP:
           i++;
       }
 
-      codeRet +=
+      codeRet += Tabulators +
           "cmp " +
           candyVarToRegister(wordSymbol) +
           "," +
@@ -205,7 +293,18 @@ DATA_MODUCANDY_DATA_GETEIP:
           i++;
       }
 
-      codeRet += "jg " + label.toUpperCase() + "\n";
+      codeRet += Tabulators + "jg " + label.toUpperCase() + "\n";
+      }
+        else if (c === '<' && wordSymbol === "") {
+      i++;
+
+      let label = "";
+      while (isLetter(code[i])) {
+          label += code[i];
+          i++;
+      }
+
+      codeRet += Tabulators + "jl " + label.toUpperCase() + "\n";
       }
       else if (c === '+') {
       i++;
@@ -216,7 +315,7 @@ DATA_MODUCANDY_DATA_GETEIP:
           i++;
       }
 
-      codeRet +=
+      codeRet += Tabulators +
           "add " +
           candyVarToRegister(wordSymbol) +
           "," +
@@ -232,7 +331,7 @@ DATA_MODUCANDY_DATA_GETEIP:
           i++;
       }
 
-      codeRet +=
+      codeRet += Tabulators +
           "SimpleMultiplication " +
           candyVarToRegister(wordSymbol) +
           "," +
@@ -248,14 +347,14 @@ DATA_MODUCANDY_DATA_GETEIP:
           i++;
       }
 
-      codeRet +=
-          "push eax\n" +
-          "push edx\n" +
-          "mov eax," + candyVarToRegister(wordSymbol) + "\n" +
-          "cdq\n" +
-          "idiv " + candyVarToRegister(candyVar) + "\n" +
-          "mov " + candyVarToRegister(wordSymbol) + ",eax\n" +
-          "pop edx\n" +
+      codeRet += Tabulators +
+          "push eax\n" + Tabulators +
+          "push edx\n" + Tabulators +
+          "mov eax," + candyVarToRegister(wordSymbol) + "\n" + Tabulators +
+          "cdq\n" + Tabulators +
+          "idiv " + candyVarToRegister(candyVar) + "\n" + Tabulators +
+          "mov " + candyVarToRegister(wordSymbol) + ",eax\n" + Tabulators +
+          "pop edx\n" + Tabulators +
           "pop eax\n";
       }
       else if (c === '-' && code[i + 1] === '>') {
@@ -267,9 +366,17 @@ DATA_MODUCANDY_DATA_GETEIP:
           i++;
       }
 
-      codeRet +=
+      codeRet += Tabulators +
           "pop " +
           candyVarToRegister(candyVar) +
+          "\n";
+      }
+      else if ((c === '<' && code[i + 1] === '-') && wordSymbol !== "") {
+      i += 2;
+
+      codeRet += Tabulators +
+          "push " +
+          candyVarToRegister(wordSymbol) +
           "\n";
       }
       else if (c === '-') {
@@ -281,14 +388,14 @@ DATA_MODUCANDY_DATA_GETEIP:
           i++;
       }
 
-      codeRet +=
+      codeRet += Tabulators +
           "sub " +
           candyVarToRegister(wordSymbol) +
           "," +
           candyVarToRegister(candyVar) +
           "\n";
       }
-      else if (c === '=') {
+      else if (c === '=' && wordSymbol !== "") {
       i++;
 
       let candyVar = "";
@@ -297,7 +404,7 @@ DATA_MODUCANDY_DATA_GETEIP:
           i++;
       }
 
-      codeRet +=
+      codeRet += Tabulators +
           "mov " +
           candyVarToRegister(wordSymbol) +
           "," +
@@ -313,14 +420,21 @@ DATA_MODUCANDY_DATA_GETEIP:
           i++;
       }
 
-      codeRet += "je " + label.toUpperCase() + "\n";
+      codeRet += Tabulators + "je " + label.toUpperCase() + "\n";
       }
     
       wordSymbol = "";
-    }
   }
 
-  return codeRet + dataSection + datasReal + datasFunctions;
+  
+  return {codeRet: codeRet , dataSection: dataSection , datasReal: datasReal, datasFunctions: datasFunctions, final:codeRet+dataSection+datasReal+datasFunctions , Symbols:Symbols};
 }
 
-module.exports = { candyVarToRegister,isLetter, VariableModuCandy, parseCode}
+function parseCode(code)
+{
+  let abc = parseCodeInternal(code);
+  console.log(abc);
+  return abc.final;
+}
+
+module.exports = { candyVarToRegister,isLetter, VariableModuCandy, parseCode, parseCodeInternal, Enums}

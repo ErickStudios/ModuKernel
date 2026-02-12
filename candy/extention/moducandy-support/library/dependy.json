@@ -1,0 +1,10 @@
+{
+    "comment": "Librerias de ModuCandy",
+    "Lib": {
+        "type": "moducandy.module.tree",
+        "path": "embeded/",
+        "modules": [
+            "Math"
+        ]
+    }
+}

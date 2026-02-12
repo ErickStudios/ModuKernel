@@ -8,5 +8,5 @@ BuiltIn_Void fn Lib::Math::SimplePowLoop() {
 }
 // funcion de potencia simple
 BuiltIn_i32 fn Lib::Math::SimplePow() {
-    ->r3 ->r2 -> r1 r3<- r3=r1 unsafe "jmp LIB::MATH::SIMPLEPOWLOOP"
+    ->r3 ->r2 ->r1 r3<- r3=r1 unsafe "jmp LIB::MATH::SIMPLEPOWLOOP"
 }

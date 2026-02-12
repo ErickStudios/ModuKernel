@@ -360,6 +360,64 @@ uint8_t* CodifiqueInstruction(ModuLibCpp::String& instruction, int* len, Assembl
         
             *len = 6;
         }
+        else if (Instr == (char*)"JNE" || Instr == (char*)"JUMPIFNOTEQUAL") {
+            ModuLibCpp::String target{dorames[1]};
+            target.Trim();
+
+            for (AssemblyLabel* Label : context->Labels) {
+                if (Label->Name == target) {
+                    int instrSize = 6; // 0F 85 + rel32
+                    int rel = Label->Offset - (*code_len + instrSize);
+
+                    uint8_t* code = (uint8_t*)gMS->AllocatePool(instrSize);
+                    code[0] = 0x0F;
+                    code[1] = 0x85; // JNE near
+                    *(int32_t*)&code[2] = rel;
+                    *len = instrSize;
+                    return code;
+                }
+            }
+            *len = 6;
+        }
+        else if (Instr == (char*)"JL" || Instr == (char*)"JUMPIFLESS") {
+            ModuLibCpp::String target{dorames[1]};
+            target.Trim();
+
+            for (AssemblyLabel* Label : context->Labels) {
+                if (Label->Name == target) {
+                    int instrSize = 6; // 0F 8C + rel32
+                    int rel = Label->Offset - (*code_len + instrSize);
+
+                    uint8_t* code = (uint8_t*)gMS->AllocatePool(instrSize);
+                    code[0] = 0x0F;
+                    code[1] = 0x8C; // JL near
+                    *(int32_t*)&code[2] = rel;
+                    *len = instrSize;
+                    return code;
+                }
+            }
+
+            *len = 6;
+        }
+        else if (Instr == (char*)"JLE" || Instr == (char*)"JUMPIFLESSEQUAL") {
+            ModuLibCpp::String target{dorames[1]};
+            target.Trim();
+
+            for (AssemblyLabel* Label : context->Labels) {
+                if (Label->Name == target) {
+                    int instrSize = 6; // 0F 8E + rel32
+                    int rel = Label->Offset - (*code_len + instrSize);
+
+                    uint8_t* code = (uint8_t*)gMS->AllocatePool(instrSize);
+                    code[0] = 0x0F;
+                    code[1] = 0x8E; // JLE near
+                    *(int32_t*)&code[2] = rel;
+                    *len = instrSize;
+                    return code;
+                }
+            }
+            *len = 6;
+        }
         else if (Instr == (char*)"JG" || Instr == (char*)"JUMPIFGREATER") {
             ModuLibCpp::String target{dorames[1]};
             target.Trim();
@@ -378,6 +436,63 @@ uint8_t* CodifiqueInstruction(ModuLibCpp::String& instruction, int* len, Assembl
                 }
             }
 
+            *len = 6;
+        }
+        else if (Instr == (char*)"JGE" || Instr == (char*)"JUMPIFGREATEREQUAL") {
+            ModuLibCpp::String target{dorames[1]};
+            target.Trim();
+
+            for (AssemblyLabel* Label : context->Labels) {
+                if (Label->Name == target) {
+                    int instrSize = 6; // 0F 8D + rel32
+                    int rel = Label->Offset - (*code_len + instrSize);
+
+                    uint8_t* code = (uint8_t*)gMS->AllocatePool(instrSize);
+                    code[0] = 0x0F;
+                    code[1] = 0x8D; // JGE near
+                    *(int32_t*)&code[2] = rel;
+                    *len = instrSize;
+                    return code;
+                }
+            }
+            *len = 6;
+        }
+        else if (Instr == (char*)"JB" || Instr == (char*)"JUMPIFBELOW") {
+            ModuLibCpp::String target{dorames[1]};
+            target.Trim();
+
+            for (AssemblyLabel* Label : context->Labels) {
+                if (Label->Name == target) {
+                    int instrSize = 6; // 0F 82 + rel32
+                    int rel = Label->Offset - (*code_len + instrSize);
+
+                    uint8_t* code = (uint8_t*)gMS->AllocatePool(instrSize);
+                    code[0] = 0x0F;
+                    code[1] = 0x82; // JB near
+                    *(int32_t*)&code[2] = rel;
+                    *len = instrSize;
+                    return code;
+                }
+            }
+            *len = 6;
+        }
+        else if (Instr == (char*)"JBE" || Instr == (char*)"JUMPIFBELOWEQUAL") {
+            ModuLibCpp::String target{dorames[1]};
+            target.Trim();
+
+            for (AssemblyLabel* Label : context->Labels) {
+                if (Label->Name == target) {
+                    int instrSize = 6; // 0F 86 + rel32
+                    int rel = Label->Offset - (*code_len + instrSize);
+
+                    uint8_t* code = (uint8_t*)gMS->AllocatePool(instrSize);
+                    code[0] = 0x0F;
+                    code[1] = 0x86; // JBE near
+                    *(int32_t*)&code[2] = rel;
+                    *len = instrSize;
+                    return code;
+                }
+            }
             *len = 6;
         }
         else if (Instr == (char*)"MUL" || Instr == (char*)"MULTIPLIQUE") {
@@ -402,6 +517,55 @@ uint8_t* CodifiqueInstruction(ModuLibCpp::String& instruction, int* len, Assembl
             *len = 2;
             return code;
         }
+        else if (Instr == (char*)"JC" || Instr == (char*)"JUMPIFCARRY") {
+            ModuLibCpp::String target{dorames[1]};
+            target.Trim();
+
+            for (AssemblyLabel* Label : context->Labels) {
+                if (Label->Name == target) {
+                    int instrSize = 6; // 0F 82 + rel32
+                    int rel = Label->Offset - (*code_len + instrSize);
+
+                    uint8_t* code = (uint8_t*)gMS->AllocatePool(instrSize);
+                    code[0] = 0x0F;
+                    code[1] = 0x82; // JC near (igual que JB)
+                    *(int32_t*)&code[2] = rel;
+                    *len = instrSize;
+                    return code;
+                }
+            }
+            *len = 6;
+        }
+        else if (Instr == (char*)"JNC" || Instr == (char*)"JUMPIFNOTCARRY") {
+            ModuLibCpp::String target{dorames[1]};
+            target.Trim();
+
+            for (AssemblyLabel* Label : context->Labels) {
+                if (Label->Name == target) {
+                    int instrSize = 6; // 0F 83 + rel32
+                    int rel = Label->Offset - (*code_len + instrSize);
+
+                    uint8_t* code = (uint8_t*)gMS->AllocatePool(instrSize);
+                    code[0] = 0x0F;
+                    code[1] = 0x83; // JNC near
+                    *(int32_t*)&code[2] = rel;
+                    *len = instrSize;
+                    return code;
+                }
+            }
+            *len = 6;
+        }
+        else if (Instr == (char*)"DIV" || Instr == (char*)"DIVIDE") {
+            ModuLibCpp::String src{dorames[1]};
+            src.Trim();
+            Reg32 srcReg = CodifiqueRegister(src);
+
+            uint8_t* code = (uint8_t*)gMS->AllocatePool(2);
+            code[0] = 0xF7;
+            code[1] = (0b11 << 6) | (6 << 3) | (uint8_t)srcReg; // /6 = DIV
+            *len = 2;
+            return code;
+        }
         else if (Instr == (char*)"SIMPLEMULTIPLICATION") {
             char* ops[2];
             int opCount = StrSplit(dorames[1], ops, ',');
@@ -420,17 +584,6 @@ uint8_t* CodifiqueInstruction(ModuLibCpp::String& instruction, int* len, Assembl
                 *len = 3;
                 return code;
             }
-        }
-        else if (Instr == (char*)"DIV" || Instr == (char*)"DIVIDE") {
-            ModuLibCpp::String src{dorames[1]};
-            src.Trim();
-            Reg32 srcReg = CodifiqueRegister(src);
-
-            uint8_t* code = (uint8_t*)gMS->AllocatePool(2);
-            code[0] = 0xF7;
-            code[1] = (0b11 << 6) | (6 << 3) | (uint8_t)srcReg; // /6 = DIV
-            *len = 2;
-            return code;
         }
         else if (Instr == (char*)"AND") {
             char* ops[2];
@@ -515,13 +668,13 @@ uint8_t* CodifiqueProgram(ModuLibCpp::String& ProgramAsm, int* len)
     ModuLibCpp::String Coppy{ProgramAsm.InternalString};
     AssemblyContext Context{};
 
-    char* programLines[256];
-    int programLinesCount = StrSplit(Coppy.InternalString, programLines, '\n');
+    ModuLibCpp::Array<char*> programLines{};
+    int programLinesCount = ModuLibCpp::StrSplitArray(Coppy.InternalString, programLines, '\n');
 
     // calcular tamaño total
     int totalSize = 0;
-    uint8_t* compiledLines[256];
-    int compiledLens[256];
+    ModuLibCpp::Array<uint8_t*> compiledLines;
+    ModuLibCpp::Array<int> compiledLens;
 
     int code_len1 = 0;
 
@@ -534,15 +687,14 @@ uint8_t* CodifiqueProgram(ModuLibCpp::String& ProgramAsm, int* len)
         code_len1 += len2;
     }
 
-    for (int i = 0; i < programLinesCount; i++)
-    {
+    for (int i = 0; i < programLines.size(); i++) {
         ModuLibCpp::String line{programLines[i]};
         int len2 = 0;
 
         uint8_t* lineCompiled = CodifiqueInstruction(line, &len2, &Context, &totalSize);
 
-        compiledLines[i] = lineCompiled;
-        compiledLens[i] = len2;
+        compiledLines.push(lineCompiled);
+        compiledLens.push(len2);
         totalSize += len2;
     }
 
@@ -551,13 +703,11 @@ uint8_t* CodifiqueProgram(ModuLibCpp::String& ProgramAsm, int* len)
 
     // copiar cada instrucción compilada
     int offset = 0;
-    for (int i = 0; i < programLinesCount; i++)
-    {
-        if (compiledLines[i] != nullptr && compiledLens[i] > 0)
-        {
+    for (int i = 0; i < compiledLines.size(); i++) {
+        if (compiledLines[i] != nullptr && compiledLens[i] > 0) {
             gMS->CoppyMemory(ProgramCompiled + offset, compiledLines[i], compiledLens[i]);
             offset += compiledLens[i];
-            gMS->FreePool(compiledLines[i]); // liberar cada instrucción temporal
+            gMS->FreePool(compiledLines[i]);
         }
     }
 

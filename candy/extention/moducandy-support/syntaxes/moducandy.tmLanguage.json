@@ -35,7 +35,10 @@
 				"captures": {
 					"1": { "name": "entity.name.class.moducandy" },   
 					"2" : { "name": "keyword.moducandy" },
-					"3": { "name": "variable.moducandy" }
+					"3": { "patterns": [
+						{"match": "(\\w+)\\:\\:(?=\\w+)","captures": {"1": {"name": "entity.name.class"} }},
+						{"name": "variable.moducandy" ,"match": "\\w+"}
+					]}
 				}
 				}
 			]
@@ -118,6 +121,16 @@
 		},
 		"modern": {
 			"patterns": [{
+				"match": "(\\bstru\\b) ([\\w:.]+)",
+				"captures": {
+					"1": { "name" : "keyword.moducandy"},
+					"2":  { "patterns": [
+						{"match": "(\\w+)\\:\\:(?=\\w+)","captures": {"1": {"name": "entity.name.class"} }},
+						{"name": "entity.name.type.struct.moducandy" ,"match": "\\w+"}
+					]}
+				}
+			},
+			{
 				"match": "(\\bpbl\\b) (\\b(candy|fn)\\b)",
 				"captures": {
 					"1": {"name": "keyword.moducandy"},
