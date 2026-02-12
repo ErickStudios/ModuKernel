@@ -57,11 +57,22 @@ void operator delete[](void* p, std::size_t) noexcept {
     if (p) gMS->FreePool(p);
 }
 
+extern "C" void __cxa_throw(void* thrown_object,void* type_info,void (*destructor)(void*)) {
+    while (true) { }
+}
+extern "C" void __cxa_begin_catch(void*) { }
+extern "C" void __cxa_end_catch() { }
 /// @brief el namespace de la libreria cpp
 namespace ModuLibCpp
 {
     /// @brief version de la libreria
     const double LibraryVersion = 0.3;
+    /// @brief una excepcion base
+    class Exception {
+    public:
+        const char* mensaje;
+        Exception(const char* msg) : mensaje(msg) {}
+    };
     /// @brief un par
     /// @tparam A el tipo del a
     /// @tparam B el tipo del b
@@ -71,6 +82,14 @@ namespace ModuLibCpp
         A first;
         /// @brief el segundo
         B second;
+    };
+    /// @brief un stream
+    template<typename T>
+    class ABCStream {
+    public:
+        virtual ABCStream& operator<<(const T& value) = 0;
+        virtual ABCStream& operator>>(T& value) = 0;
+        virtual ~ABCStream() {}
     };
     /// @brief el tipo de tercero
     /// @tparam A el tipo del a
@@ -84,6 +103,36 @@ namespace ModuLibCpp
         B second;
         /// @brief el tercero
         C third;
+    };
+    /// @brief un driver
+    class IoDriver {
+        uint16_t port;
+    public:
+        explicit IoDriver(uint16_t p) : port(p) {}
+        IoDriver& operator<<(uint8_t value) {
+            asm volatile ("outb %0, %1" : : "a"(value), "Nd"(port));
+            return *this;
+        }
+        IoDriver& operator<<(uint16_t value) {
+            asm volatile ("outw %0, %1" : : "a"(value), "Nd"(port));
+            return *this;
+        }
+        IoDriver& operator<<(uint32_t value) {
+            asm volatile ("outl %0, %1" : : "a"(value), "Nd"(port));
+            return *this;
+        }
+        uint8_t operator>>(uint8_t& value) {
+            asm volatile ("inb %1, %0" : "=a"(value) : "Nd"(port));
+            return value;
+        }
+        uint16_t operator>>(uint16_t& value) {
+            asm volatile ("inw %1, %0" : "=a"(value) : "Nd"(port));
+            return value;
+        }
+        uint32_t operator>>(uint32_t& value) {
+            asm volatile ("inl %1, %0" : "=a"(value) : "Nd"(port));
+            return value;
+        }
     };
     /// @brief el array
     /// @tparam T el tipo
@@ -441,6 +490,23 @@ namespace ModuLibCpp
     using str = String;
     /// @brief alias para el string
     using string = str;
+    /// @brief el array de uint8_t`s
+    using Uint8Array = Array<uint8_t>;
+    /// @brief el array de int8_t`s
+    using Int8Array = Array<int8_t>;
+    /// @brief el array de uint16_t`s
+    using Uint16Array = Array<uint16_t>;
+    /// @brief el array de int16_t`s
+    using Int16Array = Array<int16_t>;
+    /// @brief el array de uint32_t`s
+    using Uint32Array = Array<uint32_t>;
+    /// @brief el array de int32_t`s
+    using Int32Array = Array<int32_t>;
+    /// @brief array de strings
+    using StringsArray = Array<String>;
+    /// @brief el vector
+    template<typename T1, typename T2>
+    using Vector = Array<Pair<T1, T2>>;
     /// @brief clase de mapa
     /// @tparam K el key
     /// @tparam V el value
@@ -487,6 +553,85 @@ namespace ModuLibCpp
         Pair<K,V>* begin() { return data.begin(); }
         Pair<K,V>* end() { return data.end(); }
     };
+    /// @brief representa un buffer genérico
+    template<typename ContentType>
+    class Buffer {
+    private:
+        ContentType* buffer; // puntero al bloque de memoria
+        int size;            // número de elementos
+
+    public:
+        /// @brief constructor que reserva memoria
+        Buffer() : size(0) , buffer(nullptr) {
+        }
+        /// @brief destructor que libera memoria
+        ~Buffer() {
+            delete[] buffer;
+        }
+        /// @brief setea el buffer
+        /// @param Size el tamaño
+        /// @param Buffer el buffer
+        void SetBuffer(int Size, ContentType Buffer)
+        {
+            buffer = Buffer;
+            size = Size;
+        }
+        /// @brief acceso por índice
+        ContentType& operator[](int index) {
+            return buffer[index];
+        }
+        /// @brief tamaño del buffer
+        int getSize() const {
+            return size;
+        }
+        /// @brief devuelve el puntero crudo (si lo necesitas)
+        ContentType* data() {
+            return buffer;
+        }
+    };
+    /// @brief representa un archivo cargado en memoria
+    template<typename BufferType>
+    class File {
+    private:
+        BufferType content;   // contenido del archivo
+        int size;              // tamaño en bytes
+        String name;           // nombre del archivo (copiado, no referencia)
+        FatFile file;          // el archivo
+
+    public:
+        /// @brief constructor que abre y carga un archivo
+        File(const String& filename) : name(filename), content(nullptr), size(0) {
+            FatFile filet = gSys->File->OpenFile(filename.InternalString);
+
+            file = filet;
+
+            void* intCont;
+            int sz;
+            KernelStatus status = gSys->File->GetFile(filet, &intCont, &sz);
+
+            if (!status) {
+                content = static_cast<BufferType>(intCont);
+                size = sz;
+            } else {
+                content = nullptr;
+            }
+        }
+        /// @brief acceso al contenido
+        BufferType data() { return content; }
+        /// @brief tamaño del archivo
+        int getSize() const { return size; }
+        /// @brief nombre del archivo
+        const String& getName() const { return name; }
+        File& operator>>(BufferType& outBuffer) {
+            outBuffer = content;
+            return *this;
+        }
+        File& operator<<(const Pair<BufferType, int>* inBuffer) {
+            // escribir contenido en el archivo
+            gSys->File->WriteFile(file, (void*)inBuffer->first, inBuffer->second);
+            return *this;
+        }
+    };
     /// @brief para separar un string
     /// @param str el string
     /// @param buffer el buffer
@@ -517,5 +662,10 @@ namespace ModuLibCpp
         }
 
         return count;
+    }
+    /// @brief el endline
+    String EndLine{"\n"};
+    void Initialize(KernelServices* Services) {
+        InitializeLibrary(Services);
     }
 }

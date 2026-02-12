@@ -118,21 +118,19 @@ extern "C" KernelStatus ErickMain(KernelServices* Services) {
             file = arg;
     }
 
-    // archivo
-    FatFile OpenFile = Services->File->OpenFile(file);
-    ObjectAny OpenFileContent;
-    Entero OpenFileSize;
-    KernelStatus OpenFileStatus = (KernelStatus)gSys->File->GetFile(OpenFile, &OpenFileContent, &OpenFileSize);
+    ModuLibCpp::File<char*> File{file};
 
     // si no se pudo abrir
-    if (OpenFileStatus) {
+    if (File.data() == nullptr) {
         ModuLibCpp::String Text{};
         Editor(Text);
         return KernelStatusSuccess;
     }
 
     // el archivo
-    ModuLibCpp::String FileContent = ModuLibCpp::String{(const char*)OpenFileContent};
+    ModuLibCpp::String FileContent = ModuLibCpp::String{};
+
+    File >> FileContent.InternalString;
 
     Editor(FileContent);
     return KernelStatusSuccess;

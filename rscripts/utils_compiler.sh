@@ -39,7 +39,7 @@ function compile_cpp() {
 
     # compilar con g++
     g++ -m32 -ffreestanding -fno-pic -fno-stack-protector -nostdlib \
-        -fno-exceptions -fno-rtti -c "$src" -o temp.o -w 1>/dev/null
+        -fno-exceptions -fno-use-cxa-atexit -fno-rtti -c "$src" -o temp.o -w 1>/dev/null
 
     # linkear igual que en C
     ld -m elf_i386 -T ABI/user_link.ld --oformat binary temp.o -o "$out"
