@@ -838,6 +838,7 @@ unsigned int FatFileGetContentSector(FatFile* file) {
 }
 KernelStatus InternalFloppyDiskReadSector(unsigned int lba, unsigned char* buffer_phys)
 {
+
     // 1. LBA -> CHS
     unsigned int cyl = lba / (2 * 18);
     unsigned int head = (lba / 18) % 2;
@@ -975,13 +976,36 @@ KernelStatus InternalAtaDiskReadSector(unsigned int lba, unsigned char* buffer)
 	// retornar status
 	return KernelStatusSuccess;
 }
+KernelStatus InternalAtaDiskReadSectorHdb(unsigned int lba, unsigned char* buffer)
+{
+    // Seleccionar Primary Slave (hdb)
+    outb(0x1F6, 0xF0 | ((lba >> 24) & 0x0F));
+
+    // Configurar sector
+    outb(0x1F2, 1);
+    outb(0x1F3, (uint8_t) lba);
+    outb(0x1F4, (uint8_t)(lba >> 8));
+    outb(0x1F5, (uint8_t)(lba >> 16));
+    outb(0x1F7, 0x20); // comando READ SECTOR
+
+    int timeout = 100000;
+    while (!(inb(0x1F7) & 0x08) && (timeout--))
+        if (timeout < 1) return KernelStatusInfiniteLoopTimeouted;
+
+    // Leer 512 bytes (256 palabras)
+    for (int i = 0; i < 256; i++)
+        ((uint16_t*)buffer)[i] = inw(0x1F0);
+
+    return KernelStatusSuccess;
+}
 KernelStatus InternalRealDiskReadSector(unsigned int lba, unsigned char* buffer, DiskTypePort FileSystem)
 {
 	return 	(
 			(FileSystem == DiskTypeHardDisk) ? InternalAtaDiskReadSector(lba, buffer) : 
 			(FileSystem == DiskTypeFloppy) ? InternalFloppyDiskReadSector(lba, buffer) :
 			(FileSystem == DiskTypeCdRom) ? InternalCdRomDiskReadSector(lba, buffer) :
-			KernelStatusInvalidParam);
+			(FileSystem == DiskTypeHardDisk2 ? InternalAtaDiskReadSectorHdb(lba, buffer) :
+			 KernelStatusInvalidParam));
 }
 KernelStatus InternalDiskReadSector(unsigned int lba, unsigned char* buffer) 
 {
@@ -1453,29 +1477,74 @@ KernelStatus InternalDiskGetFile(FatFile file, void** content, int* size)
 	FreePool(fat);
     return KernelStatusSuccess;
 }
+int FindFreeCluster(unsigned char* fat, struct _FAT12_BootSector* bs) {
+    int total_clusters = (bs->total_sectors - 
+                         (bs->reserved_sectors + bs->num_fats * bs->fat_size_sectors +
+                          ((bs->root_entries * 32) / bs->bytes_per_sector)))
+                         / bs->sectors_per_cluster;
+
+    for (int cluster = 2; cluster < total_clusters; cluster++) {
+        if (get_fat_entry(cluster, fat) == 0) {
+            return cluster; // libre
+        }
+    }
+    return -1; // no hay espacio
+}
+void set_fat_entry(int cluster, int value, unsigned char* fat) {
+    int offset = (cluster * 3) / 2;
+
+    if (cluster & 1) {
+        // clúster impar → usa los 12 bits altos
+        fat[offset] = (fat[offset] & 0x0F) | ((value & 0x0F) << 4);
+        fat[offset + 1] = (value >> 4) & 0xFF;
+    } else {
+        // clúster par → usa los 12 bits bajos
+        fat[offset] = value & 0xFF;
+        fat[offset + 1] = (fat[offset + 1] & 0xF0) | ((value >> 8) & 0x0F);
+    }
+}
 KernelStatus InternalDiskWriteFile(FatFile file, void* content, int size) {
     struct _FAT12_BootSector* bs = file.bs;
     struct _FAT12_DirEntry* entry = &file.sector;
 
-    unsigned short cluster = entry->first_cluster;
-    unsigned char* fat = LoadFAT(bs); // leer FAT completa
+    unsigned char* fat = LoadFAT(bs);
+    if (!fat) return KernelStatusNoBudget;
 
+    int clusters_needed = (size + bs->bytes_per_sector - 1) / bs->bytes_per_sector;
+    int prev_cluster = 0;
+    int first_cluster = 0;
     int written = 0;
-    while (cluster < 0xFF8 && written < size) {
-        int sector = FatClusterToSector(bs, cluster);
-        char buffer[512];
-        int to_write = min(512, size - written);
 
-        InternalMemoryCopy(buffer, (unsigned char*)content + written, to_write);
-        InternalRealDiskWriteSector(sector, buffer, SystemCwkDisk);
+    // 1. Asignar clústeres libres
+    for (int i = 0; i < clusters_needed; i++) {
+        int new_cluster = FindFreeCluster(fat, bs);
+        if (new_cluster == -1) return KernelStatusNoBudget;
 
+        if (first_cluster == 0) first_cluster = new_cluster;
+        if (prev_cluster != 0) set_fat_entry(prev_cluster, new_cluster, fat);
+
+        prev_cluster = new_cluster;
+
+        // 2. Escribir datos en el sector correspondiente
+        int sector = FatClusterToSector(bs, new_cluster);
+        int to_write = min(bs->bytes_per_sector, size - written);
+        InternalRealDiskWriteSector(sector, (uint8_t*)content + written, SystemCwkDisk);
         written += to_write;
-        cluster = get_fat_entry(cluster, fat); // siguiente clúster
     }
 
-    // actualizar tamaño en la entrada
+    // marcar fin de archivo
+    set_fat_entry(prev_cluster, 0xFFF, fat);
+
+    // 3. Actualizar entrada de directorio
+    entry->first_cluster = first_cluster;
     entry->file_size = size;
     InternalReplaceFileFatEntry(file, file);
+
+    // 4. Escribir FAT modificada en disco
+    for (int s = 0; s < bs->fat_size_sectors; s++) {
+        InternalRealDiskWriteSector(bs->reserved_sectors + s, fat + s * bs->bytes_per_sector, SystemCwkDisk);
+    }
+
     return KernelStatusSuccess;
 }
 void InternalSetAttriubtes(char bg, char fg)
@@ -2272,6 +2341,55 @@ void InternalSysCommandExecute(KernelServices* Services, char* command, int lena
 	{ 
 		bool ls_legacy = 0;
 		if (StrCmp(command, "ls -s") == 0) ls_legacy = 1;
+		if (GetFsType() == 1)
+		{
+			uint8_t InfoSector[512];
+			InternalDiskReadSector(1, InfoSector);
+			
+			ErickFsFirstSector* DiskInfo = (ErickFsFirstSector*) InfoSector;
+
+			char bufferToString[10];
+
+			Services->Display->printg("TotalFiles: ");
+			IntToHexString(DiskInfo->TotalFiles,bufferToString); Services->Display->printg(bufferToString);
+			Services->Display->printg("\n");
+			Services->Display->printg("TotalSectors: ");
+			IntToHexString(DiskInfo->TotalSectors,bufferToString); Services->Display->printg(bufferToString);
+			Services->Display->printg("\n");
+			Services->Display->printg("TableStartSector: ");
+			IntToHexString(DiskInfo->TableStartSector,bufferToString); Services->Display->printg(bufferToString);
+			Services->Display->printg("\n");
+			Services->Display->printg("TablesPerSector: ");
+			IntToHexString(DiskInfo->TablesPerSector,bufferToString); Services->Display->printg(bufferToString);
+			Services->Display->printg("\n");
+			Services->Display->printg("FirstFreeSector: ");
+			IntToHexString(DiskInfo->FirstFreeSector,bufferToString); Services->Display->printg(bufferToString);
+			Services->Display->printg("\n");
+
+			size_t totalSectors = CeilDiv(DiskInfo->TotalFiles, DiskInfo->TablesPerSector);
+
+			for (size_t sectorIndex = 0; sectorIndex < totalSectors; sectorIndex++) {
+				uint8_t BufferSector[512];
+				InternalDiskReadSector(sectorIndex + DiskInfo->TableStartSector, BufferSector);
+
+				for (size_t fileIndex = 0; fileIndex < DiskInfo->TablesPerSector; fileIndex++) {
+					if (((sectorIndex * DiskInfo->TablesPerSector) + fileIndex) > DiskInfo->TotalFiles) break;
+					ErickFileEntry* Entry = (ErickFileEntry*)(BufferSector + (fileIndex * sizeof(ErickFileEntry)));
+
+					uint32_t fileNameSector = Entry->FileNamePtr / 512;
+					uint32_t fileNameOffset = Entry->FileNamePtr % 512;
+
+					uint8_t BufferName[512];
+					InternalDiskReadSector(fileNameSector, BufferName);
+					char* name = BufferName + fileNameOffset;
+					Services->Display->printg(BufferName);
+					Services->Display->printg("   ");
+				}
+			}
+			
+			return;
+		}
+
 		FatFile StructureFs = Services->File->FindFile("FSLST   ", "IFS");
 		void* StructFs; int FsSize;
 		KernelStatus StructureFound = Services->File->GetFile(StructureFs, &StructFs, &FsSize);
@@ -2879,7 +2997,8 @@ void InternalSysCommandExecute(KernelServices* Services, char* command, int lena
 		else if (StrCmp(Upper, "HDA") == 0) *(Services->File->CurrentDiskType) = DiskTypeHardDisk;
 		// cambiar a cdrom
 		else if (StrCmp(Upper, "CDROM") == 0) *(Services->File->CurrentDiskType) = DiskTypeCdRom;
-	
+		// cambiar a hard disk
+		else if (StrCmp(Upper, "HDB") == 0) *(Services->File->CurrentDiskType) = DiskTypeHardDisk2;
 		// liberar pool
 		Services->Memory->FreePool(Upper);
 	}
@@ -2968,13 +3087,16 @@ void k_main()
 		,0);
 
 	// opciones
+	int end_disk_menu = 11;
 	InternalPrintg		("Boot From:",5);
 	InternalPrintg		("a) Hard Disk",7);
 	InternalPrintg		("b) Floppy Disk",8);
 	InternalPrintg		("c) CD-ROM",9);
-	InternalPrintg		("Enter key for chose the Hard Disk",11);
-	InternalPrintg		("d) enable/unable 0xB8000 forze (cant change to 0xA0000)",13);
-	InternalPrintg		("e) exit kernel",14);
+	InternalPrintg		("f) Secondary HardDisk",10);
+
+	InternalPrintg		("Enter key for chose the Hard Disk",end_disk_menu + 1);
+	InternalPrintg		("d) enable/unable 0xB8000 forze (cant change to 0xA0000)",end_disk_menu + 2);
+	InternalPrintg		("e) exit kernel",end_disk_menu + 3);
 
 	// la variable de la opcion
 	char Option = 0;
@@ -2991,6 +3113,7 @@ ChoseDiskToBoot:
 	if (Option == 'A' || Option == '\n') SystemCwkDisk = DiskTypeHardDisk;	// disco duro
 	else if (Option == 'B') SystemCwkDisk = DiskTypeFloppy;	// disco floppy
 	else if (Option == 'C') SystemCwkDisk = DiskTypeCdRom;	// cdrom
+	else if (Option == 'F') SystemCwkDisk = DiskTypeHardDisk2;	// hdc
 	else goto ChoseDiskToBoot;	// no es valido
 
 	InternalDebug("ModuKernel Debug Console\n\nBienvenido a la consola de desarrollo de tu kernel basado en ModuKernel, aqui veras las noticias que mande tu sistema operativo en tiempo real, puede tambien proximamente mandar acciones al kernel y interrumpir\n");

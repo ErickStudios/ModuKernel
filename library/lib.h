@@ -10,6 +10,10 @@ extern "C" {
 
 #include "../libc/String.h"
 
+static inline uint32_t CeilDiv(uint32_t a, uint32_t b) {
+    return (a + b - 1) / b;
+}
+
 static uint16_t inw(uint16_t port) {
     uint16_t ret;
     __asm__ __volatile__("inw %1, %0" : "=a"(ret) : "Nd"(port));

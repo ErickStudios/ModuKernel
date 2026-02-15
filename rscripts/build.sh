@@ -9,6 +9,8 @@ UnableModuShUtilities=false
 UnableUserFiles=false
 UnableKernelCompilation=false
 
+nasm -f bin efskit/efs_kit.asm -o efskit/efs_kit.bin
+
 # importar funciones
 source rscripts/utils_compiler.sh
 
@@ -249,19 +251,29 @@ EOF
 
 # crear disco
 grub-mkrescue -o build/os.iso config;dd if=/dev/zero of=build/floppy.img bs=1024 count=1440
+xa=true
 
-# crear el floppy
-mkfs.fat -F 12 build/floppy.img;mkdir -p /mnt/qemu_floppy;sudo mount -o loop build/floppy.img /mnt/qemu_floppy
-# como plus puedes usar tambien una unidad de floppy disk
-sudo cp floppy/* /mnt/qemu_floppy/;sudo umount /mnt/qemu_floppy
+if [ "$xa" = true ]; then
 
+    python efs_kit.py -porfile new build/floppy 1474560
+    for file in floppy/*; do
+        python efs_kit.py -porfile add build/floppy "$(basename $file):$file"
+    done
+
+    python efs_kit.py -porfile build build/floppy
+else
+    # crear el floppy
+    mkfs.fat -F 12 build/floppy.img;mkdir -p /mnt/qemu_floppy;sudo mount -o loop build/floppy.img /mnt/qemu_floppy
+    # como plus puedes usar tambien una unidad de floppy disk
+    sudo cp floppy/* /mnt/qemu_floppy/;sudo umount /mnt/qemu_floppy
+fi
 # arranca qemu
 qemu-system-i386                                              \
   -cpu pentium3                                               \
   -cdrom build/os.iso                                         \
-  -boot d                                                     \
-  -fda build/floppy.img                                       \
   -hda build/disk.img                                         \
+  -boot d                                                     \
+  -hdb build/floppy.img                                       \
   -m 256M                                                     \
   -vga std                                                    \
   -device isa-debugcon,chardev=mimami                         \
@@ -269,3 +281,5 @@ qemu-system-i386                                              \
   -netdev user,id=net0                                        \
   -device rtl8139,netdev=net0,mac=52:54:00:12:34:56           \
   -audiodev pa,id=snd0,out.frequency=44100,out.channels=2
+
+#-hda build/disk.img -boot d                                        \

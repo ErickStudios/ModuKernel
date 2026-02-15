@@ -30,7 +30,7 @@ void DrawEditor(ModuLibCpp::Array<ModuLibCpp::String>& Lines) {
     }
 }
 
-KernelStatus Editor(ModuLibCpp::String& Text) {
+KernelStatus Editor(ModuLibCpp::String& Text, ModuLibCpp::String& outtext) {
     
     /// @brief si esta en modo editor
     bool InEditMode = false;
@@ -65,6 +65,14 @@ KernelStatus Editor(ModuLibCpp::String& Text) {
             }
             else if (StrCmp(Command, "qs") == 0)
             {
+                ModuLibCpp::String LinesCombined{};
+                
+                for (auto& line : Lines)
+                {
+                    LinesCombined << line << "\n";
+                }
+                LinesCombined.RemoveLastChar();
+                outtext.SetString(LinesCombined.InternalString);
                 return KernelStatusSuccess;
             }
         }
@@ -123,7 +131,7 @@ extern "C" KernelStatus ErickMain(KernelServices* Services) {
     // si no se pudo abrir
     if (File.data() == nullptr) {
         ModuLibCpp::String Text{};
-        Editor(Text);
+        Editor(Text, Text);
         return KernelStatusSuccess;
     }
 
@@ -132,6 +140,14 @@ extern "C" KernelStatus ErickMain(KernelServices* Services) {
 
     File >> FileContent.InternalString;
 
-    Editor(FileContent);
+    ModuLibCpp::String ContentView{};
+    KernelStatus Ed = Editor(FileContent, ContentView);
+
+    if (Ed == KernelStatusSuccess)
+    {
+        ModuLibCpp::Display::Print(ContentView.InternalString);
+        int Size = StrLen(ContentView.InternalString) + 1;
+        File << ModuLibCpp::Pair<char*, int>{ContentView.InternalString, Size};
+    }
     return KernelStatusSuccess;
 }

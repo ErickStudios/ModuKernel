@@ -1,10 +1,9 @@
-/kernel/denv;AC0;BIN;
-/kernel/icat;AC1;BIN;
-/kernel/init;AC2;BIN;
-/kernel/mas;AC3;BIN;
-/kernel/mcandy;AC4;BIN;
-/kernel/medit;AC5;BIN;
-/kernel/modush;AC6;BIN;
+/kernel/icat;AC0;BIN;
+/kernel/init;AC1;BIN;
+/kernel/mas;AC2;BIN;
+/kernel/mcandy;AC3;BIN;
+/kernel/medit;AC4;BIN;
+/kernel/modush;AC5;BIN;
 /dev/mps2;DV0;BIN;
 /dev/mups2;DV1;BIN;
 /dev/pci;DV2;BIN;

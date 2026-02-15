@@ -26,7 +26,7 @@ SECTIONS
     *(.bss*) *(COMMON)    /* coloca todas las variables sin inicializar */
     __bss_end = .;        /* marca fin de bss */
     }
- 
+
     .kstack (NOLOAD) :
     {
         __kstack_start = .;

@@ -6,6 +6,10 @@ typedef unsigned long long size_t;
 
 // E/S
 
+static inline uint32_t CeilDiv(uint32_t a, uint32_t b) {
+    return (a + b - 1) / b;
+}
+
 static uint8_t inb(uint16_t port) {
     uint8_t ret;
     __asm__ __volatile__("inb %1, %0" : "=a"(ret) : "dN"(port));

@@ -9,5 +9,7 @@ typedef enum _DiskTypePort
     DiskTypeFloppy,
     /* disco CD-ROM */
     DiskTypeCdRom,
+    /* disco segundo */
+    DiskTypeHardDisk2
 } DiskTypePort;
 #endif

@@ -21,7 +21,7 @@ typedef struct _FatFile (*KernelSimpleDiskOpen)(char* path);
 /* para cerrar un archivo */
 typedef void (*KernelSimpleDiskCloseFile)(struct _FatFile File);
 /* para escribir en un archivo */
-typedef void (*KernelSimpleDiskWriteFile)(struct _FatFile File, void* content, int size);
+typedef KernelStatus (*KernelSimpleDiskWriteFile)(struct _FatFile File, void* content, int size);
 /* servicios de disco */
 typedef struct _DiskServices {
     /* funcion para ejecutar un archivo, esta funcion requiere

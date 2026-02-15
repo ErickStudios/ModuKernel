@@ -82,6 +82,12 @@ namespace ModuLibCpp
         A first;
         /// @brief el segundo
         B second;
+        /// @brief lo crea
+        Pair() : first(), second() {}
+        /// @brief lo crea
+        /// @param a el a
+        /// @param b el b
+        Pair(const A& a, const B& b) : first(a), second(b) {}
     };
     /// @brief un stream
     template<typename T>
@@ -626,9 +632,10 @@ namespace ModuLibCpp
             outBuffer = content;
             return *this;
         }
-        File& operator<<(const Pair<BufferType, int>* inBuffer) {
+        File& operator<<(const Pair<BufferType, int>& inBuffer) {
             // escribir contenido en el archivo
-            gSys->File->WriteFile(file, (void*)inBuffer->first, inBuffer->second);
+            KernelStatus xd = gSys->File->WriteFile(file, (void*)inBuffer.first, inBuffer.second);
+            Display::Print(StatusToString(xd));
             return *this;
         }
     };
