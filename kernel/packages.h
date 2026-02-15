@@ -28,7 +28,7 @@ void InternalPackageLaunch(KernelPackageType Type, uint32_t Data)
     PackagesKernel = New;
 }
 KernelPackage InternalPackageCatch() {
-    KernelPackage empty = {0}; // paquete vacío si no hay nada
+    KernelPackage empty = {(KernelPackageType)0}; // paquete vacío si no hay nada
     if (PackagesIndexCount == 0) {
         return empty;
     }

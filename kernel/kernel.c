@@ -95,6 +95,11 @@ extern function isr_keyboard_stub();
 extern function isr_idt_stub();
 extern function SetPaletteColor(char index, char r, char g, char b);
 
+// C++ functions
+extern KernelStatus ErickFS_GetFileContent(FatFile File, void** content, int* size);
+extern KernelStatus HelloFromCpp(KernelServices* Services);
+extern function pic_handler(regs_t* r);
+
 // pit
 #define PIT_FREQUENCY     1193182
 #define PIT_PORT_COMMAND  0x43
@@ -120,19 +125,6 @@ extern function SetPaletteColor(char index, char r, char g, char b);
 
 uint32_t PitCounter = 0;
 
-uint32_t GetRegValue(regs_t* r, uint8_t index) {
-    switch (index) {
-        case 0: return r->eax;
-        case 1: return r->ecx;
-        case 2: return r->edx;
-        case 3: return r->ebx;
-        case 4: return r->esp;
-        case 5: return r->ebp;
-        case 6: return r->esi;
-        case 7: return r->edi;
-        default: return 0;
-    }
-}
 void AddProtectedZone(ProtectionType Type, uint32_t Start, uint32_t Size) {
     // reservar espacio para una zona más
     ProtectedZone* newZones = AllocatePool((ProtectedZonesCount + 1) * sizeof(ProtectedZone));
@@ -166,84 +158,6 @@ void InternalSendCharToSerialFy(char ch) {
 
     // enviar carácter
     outb(0x3F8, (uint8_t)ch);
-}
-uint32_t DecodeEffectiveAddress(regs_t* r, uint8_t* instr) {
-    uint8_t modrm = instr[0];
-    uint8_t mod = (modrm >> 6) & 0x3;
-    uint8_t rm  = modrm & 0x7;
-
-    uint32_t addr = 0;
-    int offset = 1; // después de ModR/M
-
-    if (mod == 0 && rm == 5) {
-        // disp32 absoluto
-        addr = *(uint32_t*)&instr[offset];
-        offset += 4;
-    } else if (mod == 0) {
-        // dirección en registro base
-        addr = GetRegValue(r, rm); // suponiendo regs[] = EAX, ECX, EDX, EBX, ESP, EBP, ESI, EDI
-    } else if (mod == 1) {
-        int8_t disp8 = *(int8_t*)&instr[offset];
-        offset += 1;
-        addr = GetRegValue(r, rm) + disp8;
-    } else if (mod == 2) {
-        int32_t disp32 = *(int32_t*)&instr[offset];
-        offset += 4;
-        addr = GetRegValue(r, rm) + disp32;
-    }
-
-    // caso especial: rm=4 → SIB
-    if (rm == 4) {
-        uint8_t sib = instr[offset];
-        offset++;
-        uint8_t base = sib & 0x7;
-        uint8_t index = (sib >> 3) & 0x7;
-        uint8_t scale = (sib >> 6) & 0x3;
-
-        addr = GetRegValue(r, base) + (GetRegValue(r, index) << scale);
-
-        if (mod == 1) {
-            int8_t disp8 = *(int8_t*)&instr[offset];
-            offset++;
-            addr += disp8;
-        } else if (mod == 2) {
-            int32_t disp32 = *(int32_t*)&instr[offset];
-            offset += 4;
-            addr += disp32;
-        }
-    }
-
-    return addr;
-}
-void InternalSecurityModifier(regs_t* r)
-{
-	// el kernel puede hacer cualquier cosa
-	if (InternalRingLevel == 0) return;
-
-	// el codigo
-	uint8_t *instr = (uint8_t*)r->eip;
-	uint8_t opcode = instr[0];
-
-    if (opcode == 0x89 || opcode == 0xC7) {
-        uint8_t modrm = instr[1];
-        uint8_t mod = (modrm >> 6) & 0x3;
-        uint8_t rm  = modrm & 0x7;
-
-        if (mod != 3) {
-            uint32_t addr = DecodeEffectiveAddress(r, instr+1);
-
-			if (IsAddressProtected(addr)) r->eip = (uint32_t)InCaseOfViolationOfSecurity;
-        }
-    }
-}
-void pic_handler(regs_t* r) {
-	// acciones multitarea
-	InternalSecurityModifier (r);				// verificar integridad
-	packages_gc (r);							// recolector de buses basuar
-
-	// interrupcion terminada
-	PitCounter++;								// incrementar los eticks que pasaron
-    outb(0x20, 0x20); 							// terminar la interrupcion
 }
 static void pic_remap(void) {
     // ICW1: iniciar
@@ -1400,7 +1314,7 @@ KernelStatus InternalDiskGetFile(FatFile file, void** content, int* size)
 {
 	if (GetFsType() == 1)
 	{
-		ErickFsFindFile(file.ErickFSFileName, content, size);
+		ErickFS_GetFileContent(file, content, size);
 		return KernelStatusSuccess;
 	}
 
@@ -1909,14 +1823,62 @@ void InitializeKernel(KernelServices* Services)
     // hacer global la estructura principal
     GlobalServices = Services;
 }
-FatFile InternalExtendedFindFile(char* path)
+FatFile InternalExtendedFindFile(char* patha)
 {
+	char* path = patha;
 	if (GetFsType() == 1)
 	{
-		FatFile file;
-		file.ErickFSFileName = path;
-		return file;
+		uint8_t InfoSector[512];
+		InternalDiskReadSector(1, InfoSector);
+			
+		ErickFsFirstSector* DiskInfo = (ErickFsFirstSector*) InfoSector;
+
+		size_t totalSectors = CeilDiv(DiskInfo->TotalFiles, DiskInfo->TablesPerSector);
+
+		for (size_t sectorIndex = 0; sectorIndex < totalSectors; sectorIndex++) {
+			uint8_t BufferSector[512];
+			InternalDiskReadSector(sectorIndex + DiskInfo->TableStartSector, BufferSector);
+
+			for (size_t fileIndex = 0; fileIndex < DiskInfo->TablesPerSector; fileIndex++) {
+				if (((sectorIndex * DiskInfo->TablesPerSector) + fileIndex) > DiskInfo->TotalFiles) break;
+				ErickFileEntry* Entry = (ErickFileEntry*)(BufferSector + (fileIndex * sizeof(ErickFileEntry)));
+
+				uint32_t fileNameSector = Entry->FileNamePtr / 512;
+				uint32_t fileNameOffset = Entry->FileNamePtr % 512;
+
+				uint8_t BufferName[512];
+				InternalDiskReadSector(fileNameSector, BufferName);
+				char* name = BufferName + fileNameOffset;
+				if (StrCmp(name, path) == 0)
+				{
+					return (FatFile){
+						.bs = 0,
+						.dir = 0,
+						.sector = {
+							.file_size = Entry->FileContentSize
+						},
+						.ErickFSFileName = 0,
+						.type = FsTypeErickFS,
+						.ErickFSentry = (ErickFileEntry){
+							.FileNamePtr = Entry->FileNamePtr,
+							.FileContentPtr = Entry->FileContentPtr,
+							.FileContentSize = Entry->FileContentSize,
+							.FilePluginsPtr = Entry->FilePluginsPtr
+						}
+					};
+				}
+			}
+		}
+
+		return (FatFile){
+			.bs = 0,
+			.dir = 0,
+			.sector = {0},
+			.ErickFSFileName = 0,
+			.type = FsTypeErickFS
+		};
 	}
+
 
     // Abrir tabla FSLST.IFS
     FatFile file = GlobalServices->File->FindFile("FSLST   ", "IFS");
@@ -2348,24 +2310,6 @@ void InternalSysCommandExecute(KernelServices* Services, char* command, int lena
 			
 			ErickFsFirstSector* DiskInfo = (ErickFsFirstSector*) InfoSector;
 
-			char bufferToString[10];
-
-			Services->Display->printg("TotalFiles: ");
-			IntToHexString(DiskInfo->TotalFiles,bufferToString); Services->Display->printg(bufferToString);
-			Services->Display->printg("\n");
-			Services->Display->printg("TotalSectors: ");
-			IntToHexString(DiskInfo->TotalSectors,bufferToString); Services->Display->printg(bufferToString);
-			Services->Display->printg("\n");
-			Services->Display->printg("TableStartSector: ");
-			IntToHexString(DiskInfo->TableStartSector,bufferToString); Services->Display->printg(bufferToString);
-			Services->Display->printg("\n");
-			Services->Display->printg("TablesPerSector: ");
-			IntToHexString(DiskInfo->TablesPerSector,bufferToString); Services->Display->printg(bufferToString);
-			Services->Display->printg("\n");
-			Services->Display->printg("FirstFreeSector: ");
-			IntToHexString(DiskInfo->FirstFreeSector,bufferToString); Services->Display->printg(bufferToString);
-			Services->Display->printg("\n");
-
 			size_t totalSectors = CeilDiv(DiskInfo->TotalFiles, DiskInfo->TablesPerSector);
 
 			for (size_t sectorIndex = 0; sectorIndex < totalSectors; sectorIndex++) {
@@ -2381,12 +2325,34 @@ void InternalSysCommandExecute(KernelServices* Services, char* command, int lena
 
 					uint8_t BufferName[512];
 					InternalDiskReadSector(fileNameSector, BufferName);
+
 					char* name = BufferName + fileNameOffset;
-					Services->Display->printg(BufferName);
-					Services->Display->printg("   ");
+					if (StrnCmp(name, CurrentWorkDirectory, CwdCurrentCharacter) == 0) {
+						char* rtm = name + CwdCurrentCharacter;
+
+						// Buscar si hay otro '/' en lo que queda
+						char* slash = StrChr(rtm, '/');
+						if (slash) {
+							// Es un subdirectorio → mostrar solo el nombre del directorio
+							int len = slash - rtm;
+							char temp[64]; // buffer temporal
+							InternalMemoryCopy(temp, rtm, len);
+							temp[len] = '\0';
+
+							Services->Display->setAttrs(0, 9); // color para directorios
+							Services->Display->printg(temp);
+							Services->Display->printg("/   ");
+						} else {
+							// Es un archivo en el mismo nivel
+							Services->Display->setAttrs(0, 7); // color normal
+							Services->Display->printg(rtm);
+							Services->Display->printg("   ");
+						}
+					}
 				}
 			}
 			
+			Services->Display->printg("\n");
 			return;
 		}
 

@@ -48,16 +48,17 @@ done
 if [ "$UnableKernelCompilation" = false ]; then
 
     printf "%-40s:%-40s\n" "assembly/kernel.asm" "build/kasm.o"
-
     # compilar el kernel.asm
     nasm -f elf32 assembly/kernel.asm -o build/kasm.o -w-number-overflow 1>/dev/null
     
+    g++ -m32 -ffreestanding -fno-exceptions -fno-rtti -nostdlib -c kernel/kernel.cpp -o build/kcpp.o -w 1>/dev/null
+    printf "%-40s:%-40s\n" "kernel/kernel.cpp" "build/kcpp.o"
+
     printf "%-40s:%-40s\n" "kernel/kernel.c" "build/kc.o"
     # compilar el kernel.c
     gcc -m32 -ffreestanding -fno-stack-protector -nostdlib -c kernel/kernel.c -o build/kc.o -w 1>/dev/null
     # linkear el kernel
-    ld -m elf_i386 -T ABI/kernel_link.ld -o build/kernel build/kasm.o build/kc.o --no-warn-rwx-segments 1>/dev/null
-
+    ld -m elf_i386 -T ABI/kernel_link.ld -o build/kernel build/kasm.o build/kc.o build/kcpp.o --no-warn-rwx-segments
 fi
 # compilar los programas
 if [ "$UnableSystemRuntimePrograms" = false ]; then
@@ -256,8 +257,9 @@ xa=true
 if [ "$xa" = true ]; then
 
     python efs_kit.py -porfile new build/floppy 1474560
-    for file in floppy/*; do
-        python efs_kit.py -porfile add build/floppy "$(basename $file):$file"
+    for file in $(find floppy -type f); do
+        relpath=$(realpath --relative-to=floppy "$file")
+        python efs_kit.py -porfile add build/floppy "/$relpath:$file"
     done
 
     python efs_kit.py -porfile build build/floppy
