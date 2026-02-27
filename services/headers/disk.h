@@ -5,5 +5,7 @@
 // incluir archivos del floppy
 #include "../disk/floppy.h"
 /* tipo actual de disco */
+#ifndef __cplusplus
 DiskTypePort SystemCwkDisk = DiskTypeHardDisk;
+#endif
 #endif

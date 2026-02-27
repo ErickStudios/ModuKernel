@@ -21,7 +21,7 @@ struct PicHandler {
     /// @param r los registros
     static void Step(regs_t* r) {
         // acciones multitarea 
-        packages_gc (r);							// recolector de buses basuar
+        packages_gc (r);							// recolector de buses basura
 
         // interrupcion terminada
         PitCounter++;								// incrementar los eticks que pasaron

@@ -714,3 +714,26 @@ uint8_t* CodifiqueProgram(ModuLibCpp::String& ProgramAsm, int* len)
     *len = offset;
     return ProgramCompiled;
 }
+extern "C" uint8_t* LinkFlatBinary(uint8_t* pic_code, uint32_t size, uint32_t* outSize) {
+    // Encabezado plano: 8 bytes ("ModuFlt\0")
+    const uint32_t headerSize = 8;
+    *outSize = headerSize + size;
+
+    // Reservar buffer
+    uint8_t* image = (uint8_t*)gMS->AllocatePool(*outSize);
+
+    // Escribir firma "ModuFlt\0"
+    image[0] = 'M';
+    image[1] = 'o';
+    image[2] = 'd';
+    image[3] = 'u';
+    image[4] = 'F';
+    image[5] = 'l';
+    image[6] = 't';
+    image[7] = '\0';
+
+    // Copiar código PIC después del encabezado
+    gMS->CoppyMemory(image + headerSize, pic_code, size);
+
+    return image;
+}

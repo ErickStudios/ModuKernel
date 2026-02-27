@@ -10,6 +10,7 @@ UnableUserFiles=false
 UnableKernelCompilation=false
 
 nasm -f bin efskit/efs_kit.asm -o efskit/efs_kit.bin
+nasm -f bin efskit/template.asm -o efskit/template.bin
 
 # importar funciones
 source rscripts/utils_compiler.sh
@@ -256,7 +257,7 @@ xa=true
 
 if [ "$xa" = true ]; then
 
-    python efs_kit.py -porfile new build/floppy 1474560
+    python efs_kit.py -porfile new build/floppy 1474560 efskit/template.bin
     for file in $(find floppy -type f); do
         relpath=$(realpath --relative-to=floppy "$file")
         python efs_kit.py -porfile add build/floppy "/$relpath:$file"
@@ -273,8 +274,8 @@ fi
 qemu-system-i386                                              \
   -cpu pentium3                                               \
   -cdrom build/os.iso                                         \
-  -hda build/disk.img                                         \
   -boot d                                                     \
+  -hda build/disk.img                                         \
   -hdb build/floppy.img                                       \
   -m 256M                                                     \
   -vga std                                                    \

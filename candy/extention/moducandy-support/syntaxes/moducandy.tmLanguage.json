@@ -3,7 +3,16 @@
 	"name": "ModuCandy",
 	"patterns": [
 		{
+			"include": "#unsafe_asm" 
+		},
+		{
+			"include": "#foocandy_exclusive"
+		},
+		{
 			"include": "#keywords"
+		},
+		{
+			"include": "#attrs"
 		},
 		{
 			"include": "#strings"
@@ -28,6 +37,47 @@
 		}
 	],
 	"repository": {
+		"unsafe_asm": {
+			"begin": "(?<=\\bunsafe\\b )\"",
+			"end": "\"",
+			"name": "entity",
+			"patterns": [
+			{
+				"include": "source.asm"
+			}
+			]
+		},
+		"foocandy_exclusive": {
+			"patterns": [
+				{ 
+					"match": "\\[\\b(Uint32|Int32|Uint16|Int16|Uint8|Int8)\\b\\](([\\w\\.])+|\\[([\\w\\.])+\\])",
+					"captures": {
+						"1": { "name": "entity.name.class.moducandy "},
+						"2": { 
+							"patterns": [
+								{ "match": "(?<=\\[)\\w+(?=\\])", "name": "entity"},
+								{ "match": "\\w+", "name": "variable.moducandy"}
+							]
+						}
+					}
+				},
+				{
+					"name": "keyword",
+					"match": "\\b(safe)\\b|(?<=\\bsafe\\b )\\b(increments|decrements|jumps)\\b"
+				},
+				{
+					"match": "(?<=\\bsafe\\b \\bjumps\\b )([\\w:.]+)",
+					"captures": {
+						"1": {
+							"patterns" : [
+								{"match": "(\\w+)\\:\\:(?=\\w+)","captures": {"1": {"name": "entity.name.class"} }},
+								{"name": "entity.name.function.moducandy" ,"match": "\\w+"}
+							]
+						}
+					}
+				}
+			]
+		},
 		"variables": {
 			"patterns": [
 				{
@@ -73,7 +123,7 @@
 		"keywords": {
 			"patterns": [{
 				"name": "keyword.moducandy",
-				"match": "\\b(unsafe|fn|candy|let)\\b"
+				"match": "\\b(unsafe|fn|candy|let|__attr__)\\b"
 			},
 			{
 				"name": "keyword.control.moducandy",
@@ -102,6 +152,20 @@
 				}
 			}
 		]
+		},
+		"attrs": {
+			"begin": "(?<=\\b__attr__\\b )\"",
+			"end": "\"",
+			"name": "keyword",
+			"patterns": [
+				{
+					"match": "(\\w+)\\=(\\w+)",
+					"captures": {
+						"1": {"name": "entity.name.class"},
+						"2": {"name":"keyword"}
+					}
+				}
+			]
 		},
 		"comments": {
 			"name" : "comment",
