@@ -34,6 +34,9 @@
 		},
 		{
 			"include": "#modern"
+		},
+		{
+			"include": "#last"
 		}
 	],
 	"repository": {
@@ -63,7 +66,15 @@
 				},
 				{
 					"name": "keyword",
-					"match": "\\b(safe)\\b|(?<=\\bsafe\\b )\\b(increments|decrements|jumps)\\b"
+					"match": "\\b(safe)\\b|(?<=\\bsafe\\b )\\b(increments|decrements|jumps|numlist)\\b"
+				},
+				{
+					"match": "(?<=\\bsafe\\b \\bnumlist\\b )[\\w:.]+(?=\\<\\w+\\>)",
+					"name" : "entity.name.type.enum"
+				},
+				{
+					"match": "(?<=\\bsafe\\b \\bnumlist\\b [\\w:.]+\\<)\\w+(?=\\>)",
+					"name": "entity.name.class"
 				},
 				{
 					"match": "(?<=\\bsafe\\b \\bjumps\\b )([\\w:.]+)",
@@ -201,6 +212,22 @@
 					"2": {"name": "keyword.moducandy"}
 				}
 			}]
+		},
+		"last" : {
+			"patterns": [
+				{
+					"match": "\\b\\d+\\b",
+					"name": "constant.numeric"
+				},
+				{
+					"match": "[A-Z]\\w*",
+					"name": "entity.name.class"
+				},
+				{
+					"match": "\\b\\w+\\b",
+					"name": "variable"
+				}
+			]
 		}
 	},
 	"scopeName": "source.cdy"
